@@ -3,7 +3,6 @@ import collections
 import datetime
 import itertools
 import json
-from pprint import pprint
 from urllib.parse import urlparse
 from wsgiref.simple_server import make_server
 import zlib
@@ -36,7 +35,6 @@ class ElasticsearchTransport:
     def send(self, data):
         real_data = self.encode_data(data)
         self.postfix_encoded_data(real_data)
-        pprint(real_data.keys())
         index = self._index.format(datetime.date.today())
         self.connection.index(body=real_data, index=index,
                               doc_type='raven-log')
