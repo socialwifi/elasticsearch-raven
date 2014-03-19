@@ -24,8 +24,6 @@ def application(environ, start_response):
 
 
 class ElasticsearchTransport:
-    scheme = ['elasticsearch']
-
     def __init__(self, dsn):
         path, index, project = dsn.rsplit('/', 2)
         self._index = index
