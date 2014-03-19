@@ -1,4 +1,5 @@
 import base64
+import collections
 import datetime
 import json
 from pprint import pprint
@@ -69,19 +70,19 @@ class ElasticsearchTransport:
             yield ('%s<%s>' % (name, type(data).__name__)), data
 
     def _split_list_by_type(self, data):
-        typed_list = list(self._flatten([self.postfix_types(('', element))
-                                         for element in data]))
-        if not typed_list:
-            return {'': []}
-        else:
-            result = {}
-            for type, value in typed_list:
-                result.setdefault(type, []).append(value)
+        result = collections.defaultdict(list)
+        for element in data:
+            for type, value in self.postfix_types(('', element)):
+                result[type].append(value)
+        if result:
             return result
+        else:
+            return {'': []}
 
     def _flatten(self, l):
         for element in l:
             yield from element
+
 
 if __name__ == '__main__':
     httpd = make_server('', 8052, application)
