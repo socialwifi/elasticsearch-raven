@@ -1,6 +1,7 @@
 import base64
 import collections
 import datetime
+import itertools
 import json
 from pprint import pprint
 from urllib.parse import urlparse
@@ -46,43 +47,62 @@ class ElasticsearchTransport:
 
     def postfix_encoded_data(self, encoded_data):
         fields_to_postfix = ['extra']
-        fields_to_postfix.extend([key for key in encoded_data.keys() if key.startswith('sentry.')])
+        fields_to_postfix.extend([key for key in encoded_data.keys()
+                                  if key.startswith('sentry.')])
         for field in fields_to_postfix:
             if field in encoded_data:
-                _, encoded_data[field] = next(self.postfix_types(
+                _, encoded_data[field] = next(postfix_types(
                     ('', encoded_data[field])))
 
-    def postfix_types(self, row):
-        name, data = row
-        if isinstance(data, dict):
-            if name.endswith(">"):
-                name = name + "<dict>"  # to prevent name colisions
-            yield name, dict(self._flatten(
-                map(self.postfix_types, data.items())))
-        elif isinstance(data, str):
-            yield name + "<string>", data
-        elif isinstance(data, list):
-            for k, v in self._split_list_by_type(data).items():
-                yield (name + k, v)
-        elif data is None:
-            yield name, None
-        else:
-            yield ('%s<%s>' % (name, type(data).__name__)), data
 
-    def _split_list_by_type(self, data):
-        result = collections.defaultdict(list)
-        for element in data:
-            for type, value in self.postfix_types(('', element)):
-                result[type].append(value)
-        if result:
-            return result
-        else:
-            return {'': []}
+def postfix_types(row):
+    name, data = row
+    if data is None:
+        return postfix_none(name, data)
+    type_postfix = postfixes.get(type(data), postfix_other)
+    return type_postfix(name, data)
 
-    def _flatten(self, l):
-        for element in l:
-            yield from element
 
+def postfix_dict(name, data):
+    if name.endswith(">"):
+        name = name + "<dict>"
+    postfix_items = list(map(postfix_types, data.items()))
+    yield name, dict(itertools.chain(*postfix_items))
+
+
+def postfix_str(name, data):
+    yield name + '<string>', data
+
+
+def postfix_list(name, data):
+    for k, v in _split_list_by_type(data).items():
+        yield name + k, v
+
+
+def postfix_none(name, data):
+    yield name, None
+
+
+def postfix_other(name, data):
+    yield ('%s<%s>' % (name, type(data).__name__)), data
+
+
+postfixes = {
+    dict: postfix_dict,
+    str: postfix_str,
+    list: postfix_list,
+}
+
+
+def _split_list_by_type(data):
+    result = collections.defaultdict(list)
+    for element in data:
+        for type, value in postfix_types(('', element)):
+            result[type].append(value)
+    if result:
+        return result
+    else:
+        return {'': []}
 
 if __name__ == '__main__':
     httpd = make_server('', 8052, application)
