@@ -1,14 +1,11 @@
+from unittest import TestCase
 import urllib.parse as urlparse
-
-from django.test import TestCase
-
 from wsgi import ElasticsearchTransport
 
 
 class ElasticsearchTransportTypePostfixTest(TestCase):
     def setUp(self):
-        url = urlparse.ParseResult(scheme='elasticsearch', netloc='localhost',
-                                   path='', params='', query='', fragment='')
+        url = 'elasticsearch:localhost/a/1'
         self.transport = ElasticsearchTransport(url)
 
     def test_no_extra(self):

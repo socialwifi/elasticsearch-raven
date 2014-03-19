@@ -2,6 +2,7 @@ import base64
 import datetime
 import json
 from pprint import pprint
+from urllib.parse import urlparse
 from wsgiref.simple_server import make_server
 import zlib
 import elasticsearch
@@ -13,7 +14,8 @@ def application(environ, start_response):
     response_headers = [('Content-Type', 'text/plain'),
                         ('Content-Length', str(len(response_body)))]
 
-    transport = ElasticsearchTransport('localhost', 9200, 'a{}')
+    transport = ElasticsearchTransport(
+        'elasticsearch://127.0.0.1:9200/django-log-{0:%Y.%m.%d}/1')
     transport.send(environ['wsgi.input'].read())
 
     start_response(status, response_headers)
@@ -23,16 +25,18 @@ def application(environ, start_response):
 class ElasticsearchTransport:
     scheme = ['elasticsearch']
 
-    def __init__(self, hostname, port, dbname):
-        self.dbname = dbname
-        host = '%s:%s' % (hostname, port)
-        self.connection = elasticsearch.Elasticsearch(hosts=[host])
+    def __init__(self, dsn):
+        path, index, project = dsn.rsplit('/', 2)
+        self._index = index
+        parsed_url = urlparse(path)
+        self.connection = elasticsearch.Elasticsearch(
+            hosts=[parsed_url.netloc])
 
     def send(self, data):
         real_data = self.encode_data(data)
         self.postfix_encoded_data(real_data)
-        index = self.dbname.format(datetime.date.today())
         pprint(real_data.keys())
+        index = self._index.format(datetime.date.today())
         self.connection.index(body=real_data, index=index,
                               doc_type='raven-log')
 
