@@ -83,6 +83,6 @@ class ElasticsearchTransport:
         for element in l:
             yield from element
 
-httpd = make_server('', 8052, application)
-
-httpd.serve_forever()
+if __name__ == '__main__':
+    httpd = make_server('', 8052, application)
+    httpd.serve_forever()
