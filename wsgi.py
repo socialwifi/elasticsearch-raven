@@ -46,13 +46,20 @@ class ElasticsearchTransport:
             zlib.decompress(base64.b64decode(data)).decode('utf-8'))
 
     def postfix_encoded_data(self, encoded_data):
-        fields_to_postfix = ['extra']
-        fields_to_postfix.extend([key for key in encoded_data.keys()
-                                  if key.startswith('sentry.')])
+        field_names_to_postfix = ['extra']
+        sentry_fields = self.keys_starting_with(encoded_data, 'sentry.')
+        field_names_to_postfix.extend(sentry_fields)
+
+        fields_to_postfix = filter(lambda x: x in field_names_to_postfix,
+                                   encoded_data)
+
         for field in fields_to_postfix:
-            if field in encoded_data:
-                _, encoded_data[field] = next(postfix_types(
-                    ('', encoded_data[field])))
+            _, encoded_data[field] = next(postfix_types(
+                ('', encoded_data[field])))
+
+    @staticmethod
+    def keys_starting_with(dictionary, word):
+        return (key for key in dictionary.keys() if key.startswith(word))
 
 
 def postfix_types(row):
