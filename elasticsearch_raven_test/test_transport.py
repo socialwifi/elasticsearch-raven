@@ -1,6 +1,5 @@
 from unittest import TestCase
-import urllib.parse as urlparse
-from wsgi import ElasticsearchTransport
+from elasticsearch_raven.transport import ElasticsearchTransport
 
 
 class ElasticsearchTransportTypePostfixTest(TestCase):
