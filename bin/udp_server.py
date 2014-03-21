@@ -24,17 +24,7 @@ def send():
 
 
 def main(*args):
-    try:
-        udp_ip = args[1]
-        udp_port = int(args[2])
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind((udp_ip, udp_port))
-    except socket.gaierror:
-        sys.stdout.write('Wrong hostname')
-    except ValueError:
-        sys.stdout.write('Wrong port')
-    except IndexError:
-        sys.stdout.write('arguments: hostname port')
+    sock = get_socket(args[1], args[2])
     sender = Thread(target=send)
     sender.start()
 
@@ -44,6 +34,19 @@ def main(*args):
         blocking_queue.put(base64.b64decode(data))
         sys.stdout.write('{host}:{port} [{date}]\n'.format(
             host=addr[0], port=addr[1], date=datetime.now()))
+
+
+def get_socket(ip, port):
+    try:
+        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        sock.bind((ip, int(port)))
+    except socket.gaierror:
+        sys.stdout.write('Wrong hostname')
+    except ValueError:
+        sys.stdout.write('Wrong port')
+    except IndexError:
+        sys.stdout.write('arguments: hostname port')
+    return sock
 
 
 if __name__ == '__main__':
