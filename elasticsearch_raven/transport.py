@@ -3,7 +3,6 @@ import collections
 import datetime
 import itertools
 import json
-from urllib.parse import urlparse
 import zlib
 
 import elasticsearch
@@ -11,18 +10,15 @@ import elasticsearch
 
 class ElasticsearchTransport:
 
-    def __init__(self, dsn):
-        path, index, project = dsn.rsplit('/', 2)
-        self._index = index
-        parsed_url = urlparse(path)
-        self.connection = elasticsearch.Elasticsearch(
-            hosts=[parsed_url.netloc])
+    def __init__(self, host):
+        self.connection = elasticsearch.Elasticsearch(hosts=[host])
 
-    def send(self, data):
+    def send(self, data, index):
         real_data = self.encode_data(data)
         self.postfix_encoded_data(real_data)
-        index = self._index.format(datetime.date.today())
-        self.connection.index(body=real_data, index=index,
+
+        formatted_index = index.format(datetime.date.today())
+        self.connection.index(body=real_data, index=formatted_index,
                               doc_type='raven-log')
 
     def encode_data(self, data):
