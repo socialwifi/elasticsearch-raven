@@ -1,4 +1,3 @@
-import base64
 import collections
 import datetime
 import itertools
@@ -8,21 +7,20 @@ import zlib
 import elasticsearch
 
 
+def decode(data):
+    return json.loads(zlib.decompress(data).decode('utf-8'))
+
+
 class ElasticsearchTransport:
 
     def __init__(self, host):
         self.connection = elasticsearch.Elasticsearch(hosts=[host])
 
     def send(self, data):
-        real_data = self.encode_data(data)
-        self.postfix_encoded_data(real_data)
-        index = real_data['project'].format(datetime.date.today())
-        self.connection.index(body=real_data, index=index,
+        self.postfix_encoded_data(data)
+        index = data['project'].format(datetime.date.today())
+        self.connection.index(body=data, index=index,
                               doc_type='raven-log')
-
-    def encode_data(self, data):
-        return json.loads(
-            zlib.decompress(base64.b64decode(data)).decode('utf-8'))
 
     def postfix_encoded_data(self, encoded_data):
         field_names_to_postfix = ['extra']

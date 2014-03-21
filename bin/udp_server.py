@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import base64
 from datetime import datetime
 import os
 from queue import Queue
@@ -6,6 +7,7 @@ import socket
 import sys
 from threading import Thread
 
+from elasticsearch_raven.transport import decode
 from elasticsearch_raven.transport import ElasticsearchTransport
 
 
@@ -17,8 +19,7 @@ transport = ElasticsearchTransport(host)
 def send():
     while True:
         data = blocking_queue.get()
-        auth_header, data = data.split(b'\n\n')
-        transport.send(data)
+        transport.send(decode(data))
         blocking_queue.task_done()
 
 
@@ -38,8 +39,9 @@ def main(*args):
     sender.start()
 
     while True:
-        data, addr = sock.recvfrom(65535)
-        blocking_queue.put(data)
+        data_with_header, addr = sock.recvfrom(65535)
+        auth_header, data = data_with_header.split(b'\n\n')
+        blocking_queue.put(base64.b64decode(data))
         sys.stdout.write('{host}:{port} [{date}]\n'.format(
             host=addr[0], port=addr[1], date=datetime.now()))
 
