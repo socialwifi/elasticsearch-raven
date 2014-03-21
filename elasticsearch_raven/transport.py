@@ -13,12 +13,11 @@ class ElasticsearchTransport:
     def __init__(self, host):
         self.connection = elasticsearch.Elasticsearch(hosts=[host])
 
-    def send(self, data, index):
+    def send(self, data):
         real_data = self.encode_data(data)
         self.postfix_encoded_data(real_data)
-
-        formatted_index = index.format(datetime.date.today())
-        self.connection.index(body=real_data, index=formatted_index,
+        index = real_data['project'].format(datetime.date.today())
+        self.connection.index(body=real_data, index=index,
                               doc_type='raven-log')
 
     def encode_data(self, data):
