@@ -17,7 +17,6 @@ def send():
 
 
 sender = Thread(target=send)
-sender.daemon = True
 sender.start()
 
 
