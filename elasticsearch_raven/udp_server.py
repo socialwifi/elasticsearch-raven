@@ -13,7 +13,9 @@ from elasticsearch_raven.transport import ElasticsearchTransport
 
 def run_server():
     args = _parse_args()
-    _run_server(args.ip, args.port)
+    sock = get_socket(args.ip, args.port)
+    if sock:
+        _run_server(sock)
 
 
 def _parse_args():
@@ -23,26 +25,29 @@ def _parse_args():
     return parser.parse_args()
 
 
-def _run_server(ip, port):
+def get_socket(ip, port):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     try:
-        sock = get_socket(ip, port)
+        sock.bind((ip, int(port)))
+        return sock
     except socket.gaierror:
         sys.stdout.write('Wrong hostname\n')
-        return
 
+
+def _run_server(sock):
     blocking_queue = queue.Queue(maxsize=os.environ.get('QUEUE_MAXSIZE', 1000))
     sender = _get_sender(blocking_queue)
+    _serve(sock, blocking_queue, sender)
+
+
+def _serve(sock, blocking_queue, sender):
     sender.start()
-    _serve(sock, blocking_queue)
-
-
-def _serve(sock, blocking_queue):
     while True:
-        data_with_header, addr = sock.recvfrom(65535)
+        data_with_header, address = sock.recvfrom(65535)
         auth_header, data = data_with_header.split(b'\n\n')
         blocking_queue.put(base64.b64decode(data))
         sys.stdout.write('{host}:{port} [{date}]\n'.format(
-            host=addr[0], port=addr[1], date=datetime.datetime.now()))
+            host=address[0], port=address[1], date=datetime.datetime.now()))
 
 
 def _get_sender(blocking_queue):
@@ -54,13 +59,6 @@ def _get_sender(blocking_queue):
             data = blocking_queue.get()
             transport.send(decode(data))
             blocking_queue.task_done()
+
     sender = threading.Thread(target=_send)
     return sender
-
-
-def get_socket(ip, port):
-    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    sock.bind((ip, int(port)))
-    return sock
-
-
