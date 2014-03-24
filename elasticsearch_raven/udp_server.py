@@ -1,5 +1,4 @@
 import argparse
-import base64
 import datetime
 import os
 import queue
@@ -7,8 +6,8 @@ import socket
 import sys
 import threading
 
-from elasticsearch_raven.transport import decode
 from elasticsearch_raven.transport import ElasticsearchTransport
+from elasticsearch_raven.transport import SentryMessage
 
 
 def run_server():
@@ -43,9 +42,9 @@ def _run_server(sock):
 def _serve(sock, blocking_queue, sender):
     sender.start()
     while True:
-        data_with_header, address = sock.recvfrom(65535)
-        auth_header, data = data_with_header.split(b'\n\n')
-        blocking_queue.put(base64.b64decode(data))
+        data, address = sock.recvfrom(65535)
+        message = SentryMessage.create_from_udp(data)
+        blocking_queue.put(message)
         sys.stdout.write('{host}:{port} [{date}]\n'.format(
             host=address[0], port=address[1], date=datetime.datetime.now()))
 
@@ -56,8 +55,8 @@ def _get_sender(blocking_queue):
 
     def _send():
         while True:
-            data = blocking_queue.get()
-            transport.send(decode(data))
+            message = blocking_queue.get()
+            transport.send(message)
             blocking_queue.task_done()
 
     sender = threading.Thread(target=_send)
