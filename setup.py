@@ -7,7 +7,7 @@ setup(
     author='',
     author_email='',
     packages=['elasticsearch_raven'],
-    scripts=['bin/elasticsearch_raven.py'],
+    scripts=['bin/elasticsearch-raven.py'],
     license='LICENSE',
     description='Proxy that allows to log from raven to elasticsearch.',
     long_description=open('README.md').read(),
