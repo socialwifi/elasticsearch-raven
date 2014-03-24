@@ -27,9 +27,17 @@ def postfix_types(row):
     return type_postfix(name, data)
 
 
+def postfix_none(name, _):
+    yield name, None
+
+
+def postfix_other(name, data):
+    yield ('%s<%s>' % (name, type(data).__name__)), data
+
+
 def postfix_dict(name, data):
     if name.endswith(">"):
-        name = name + "<dict>"
+        name += "<dict>"
     postfix_items = list(map(postfix_types, data.items()))
     yield name, dict(itertools.chain(*postfix_items))
 
@@ -43,27 +51,19 @@ def postfix_list(name, data):
         yield name + k, v
 
 
-def postfix_none(name, data):
-    yield name, None
-
-
-def postfix_other(name, data):
-    yield ('%s<%s>' % (name, type(data).__name__)), data
+def _split_list_by_type(data):
+    result = collections.defaultdict(list)
+    for element in data:
+        for value_type, value in postfix_types(('', element)):
+            result[value_type].append(value)
+    if result:
+        return result
+    else:
+        return {'': []}
 
 
 postfixes = {
     dict: postfix_dict,
     str: postfix_str,
     list: postfix_list,
-    }
-
-
-def _split_list_by_type(data):
-    result = collections.defaultdict(list)
-    for element in data:
-        for type, value in postfix_types(('', element)):
-            result[type].append(value)
-    if result:
-        return result
-    else:
-        return {'': []}
+}
