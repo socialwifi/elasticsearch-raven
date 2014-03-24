@@ -4,8 +4,8 @@ from setuptools import setup
 setup(
     name='Elasticsearch-Raven',
     version='0.1.0',
-    author='',
-    author_email='',
+    author='Tomasz Wysocki',
+    author_email='tomasz@pozytywnie.pl',
     packages=['elasticsearch_raven'],
     scripts=['bin/elasticsearch-raven.py'],
     license='LICENSE',
