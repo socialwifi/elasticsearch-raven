@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+import argparse
 import base64
 from datetime import datetime
 import os
@@ -23,8 +24,13 @@ def send():
         blocking_queue.task_done()
 
 
-def main(*args):
-    sock = get_socket(args[1], args[2])
+def main(args):
+    try:
+        sock = get_socket(args.ip, args.port)
+    except socket.gaierror:
+        sys.stdout.write('Wrong hostname\n')
+        return
+
     sender = Thread(target=send)
     sender.start()
 
@@ -37,18 +43,14 @@ def main(*args):
 
 
 def get_socket(ip, port):
-    try:
-        sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        sock.bind((ip, int(port)))
-    except socket.gaierror:
-        sys.stdout.write('Wrong hostname')
-    except ValueError:
-        sys.stdout.write('Wrong port')
-    except IndexError:
-        sys.stdout.write('arguments: hostname port')
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    sock.bind((ip, int(port)))
     return sock
 
 
 if __name__ == '__main__':
-    main(*sys.argv)
+    parser = argparse.ArgumentParser(description='Udp proxy server for raven')
+    parser.add_argument('ip')
+    parser.add_argument('port', type=int, default=9200)
+    main(parser.parse_args())
 
