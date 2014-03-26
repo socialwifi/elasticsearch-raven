@@ -67,8 +67,9 @@ class ElasticsearchMessage(Message):
 
 
 class ElasticsearchTransport:
-    def __init__(self, host):
+    def __init__(self, host, use_ssl=False):
         self._host = host
+        self._use_ssl = use_ssl
 
     def send(self, message):
         message = ElasticsearchMessage.from_message(message)
@@ -76,6 +77,7 @@ class ElasticsearchTransport:
         http_auth = '{}:{}'.format(message.headers['sentry_key'],
                                    message.headers['sentry_secret'])
         connection = elasticsearch.Elasticsearch(hosts=[self._host],
-                                                 http_auth=http_auth)
+                                                 http_auth=http_auth,
+                                                 use_ssl=self._use_ssl)
         connection.index(body=message.body, index=dated_index,
                          doc_type='raven-log')

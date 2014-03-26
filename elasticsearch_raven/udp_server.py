@@ -51,7 +51,8 @@ def _serve(sock, blocking_queue, sender):
 
 def _get_sender(blocking_queue):
     host = os.environ.get('ELASTICSEARCH_HOST', 'localhost:9200')
-    transport = ElasticsearchTransport(host)
+    use_ssl = bool(os.environ.get('USE_SSL', False))
+    transport = ElasticsearchTransport(host, use_ssl)
 
     def _send():
         while True:

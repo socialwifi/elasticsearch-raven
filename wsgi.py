@@ -6,7 +6,8 @@ from elasticsearch_raven.transport import ElasticsearchTransport
 from elasticsearch_raven.transport import SentryMessage
 
 host = os.environ.get('ELASTICSEARCH_HOST', 'localhost:9200')
-transport = ElasticsearchTransport(host)
+use_ssl = os.environ.get('USE_SSL', False)
+transport = ElasticsearchTransport(host, use_ssl)
 blocking_queue = Queue()
 
 
