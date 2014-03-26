@@ -24,7 +24,8 @@ sender.start()
 def application(environ, start_response):
     length = int(environ.get('CONTENT_LENGTH', '0'))
     data = environ['wsgi.input'].read(length)
-    blocking_queue.put(SentryMessage.create_from_http(data))
+    blocking_queue.put(SentryMessage.create_from_http(
+        environ['HTTP_X_SENTRY_AUTH'], data))
 
     status = '200 OK'
     response_headers = [('Content-Type', 'text/plain')]
