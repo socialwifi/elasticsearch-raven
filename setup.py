@@ -3,7 +3,7 @@ from setuptools import setup
 
 setup(
     name='Elasticsearch-Raven',
-    version='0.1.0',
+    version='0.1.1',
     author='Tomasz Wysocki',
     author_email='tomasz@pozytywnie.pl',
     packages=['elasticsearch_raven'],
