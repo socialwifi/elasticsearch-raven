@@ -1,89 +1,83 @@
-import collections
+import base64
 import datetime
-import itertools
 import json
+import re
 import zlib
 
 import elasticsearch
+from elasticsearch_raven.postfix import postfix_encoded_data
 
 
-def decode(data):
-    return json.loads(zlib.decompress(data).decode('utf-8'))
+class Message:
+    def __init__(self, headers, body):
+        self._body = body
+        self._headers = headers
+
+    @classmethod
+    def from_message(cls, message):
+        return cls(message.headers, message.body)
+
+    @property
+    def body(self):
+        return self._body
+
+    @property
+    def headers(self):
+        return self._headers
+
+
+class SentryMessage(Message):
+    def __init__(self, headers, body):
+        super().__init__(headers, body)
+        self._compressed = True
+
+    @classmethod
+    def create_from_udp(cls, data):
+        byte_headers, data = data.split(b'\n\n')
+        headers = cls.parse_headers(str(byte_headers.decode('utf-8')))
+        data = base64.b64decode(data)
+        return cls(headers, data)
+
+    @staticmethod
+    def parse_headers(unparsed_headers):
+        m = re.search(r'sentry_key=(?P<sentry_key>[^=]+), sentry_secret='
+                      r'(?P<sentry_secret>[^=]+)$', unparsed_headers)
+        return m.groupdict()
+
+
+    @classmethod
+    def create_from_http(cls, unparsed_headers, data):
+        headers = cls.parse_headers(unparsed_headers)
+        data = base64.b64decode(data)
+        return cls(headers, data)
+
+    @property
+    def body(self):
+        if self._compressed:
+            self._body = json.loads(
+                zlib.decompress(self._body).decode('utf-8'))
+            self._compressed = False
+        return self._body
+
+
+class ElasticsearchMessage(Message):
+    def __init__(self, headers, body):
+        super().__init__(headers, body)
+        postfix_encoded_data(self._body)
 
 
 class ElasticsearchTransport:
+    def __init__(self, host, use_ssl=False):
+        self._host = host
+        self._use_ssl = use_ssl
 
-    def __init__(self, host):
-        self.connection = elasticsearch.Elasticsearch(hosts=[host])
-
-    def send(self, data):
-        self.postfix_encoded_data(data)
-        index = data['project'].format(datetime.date.today())
-        self.connection.index(body=data, index=index,
-                              doc_type='raven-log')
-
-    def postfix_encoded_data(self, encoded_data):
-        field_names_to_postfix = ['extra']
-        sentry_fields = self.keys_starting_with(encoded_data, 'sentry.')
-        field_names_to_postfix.extend(sentry_fields)
-
-        fields_to_postfix = filter(lambda x: x in field_names_to_postfix,
-                                   encoded_data)
-
-        for field in fields_to_postfix:
-            _, encoded_data[field] = next(postfix_types(
-                ('', encoded_data[field])))
-
-    @staticmethod
-    def keys_starting_with(dictionary, word):
-        return (key for key in dictionary.keys() if key.startswith(word))
-
-
-def postfix_types(row):
-    name, data = row
-    if data is None:
-        return postfix_none(name, data)
-    type_postfix = postfixes.get(type(data), postfix_other)
-    return type_postfix(name, data)
-
-
-def postfix_dict(name, data):
-    if name.endswith(">"):
-        name = name + "<dict>"
-    postfix_items = list(map(postfix_types, data.items()))
-    yield name, dict(itertools.chain(*postfix_items))
-
-
-def postfix_str(name, data):
-    yield name + '<string>', data
-
-
-def postfix_list(name, data):
-    for k, v in _split_list_by_type(data).items():
-        yield name + k, v
-
-
-def postfix_none(name, data):
-    yield name, None
-
-
-def postfix_other(name, data):
-    yield ('%s<%s>' % (name, type(data).__name__)), data
-
-
-postfixes = {
-    dict: postfix_dict,
-    str: postfix_str,
-    list: postfix_list,
-}
-
-
-def _split_list_by_type(data):
-    result = collections.defaultdict(list)
-    for element in data:
-        for type, value in postfix_types(('', element)):
-            result[type].append(value)
-    if result:
-        return result
-    else:
-        return {'': []}
+    def send(self, message):
+        message = ElasticsearchMessage.from_message(message)
+        dated_index = message.body['project'].format(datetime.datetime.now())
+        http_auth = '{}:{}'.format(message.headers['sentry_key'],
+                                   message.headers['sentry_secret'])
+        connection = elasticsearch.Elasticsearch(hosts=[self._host],
+                                                 http_auth=http_auth,
+                                                 use_ssl=self._use_ssl)
+        connection.index(body=message.body, index=dated_index,
+                         doc_type='raven-log')
