@@ -14,13 +14,16 @@ def run_server():
     args = _parse_args()
     sock = get_socket(args.ip, args.port)
     if sock:
-        _run_server(sock)
+        _run_server(sock, args.debug)
 
 
 def _parse_args():
     parser = argparse.ArgumentParser(description='Udp proxy server for raven')
     parser.add_argument('ip')
     parser.add_argument('port', type=int)
+    parser.add_argument('--debug', dest='debug', action='store_const',
+                        const=True, default=False,
+                        help='Print debug logs to stdout')
     return parser.parse_args()
 
 
@@ -33,20 +36,22 @@ def get_socket(ip, port):
         sys.stdout.write('Wrong hostname\n')
 
 
-def _run_server(sock):
+def _run_server(sock, debug=False):
     blocking_queue = queue.Queue(maxsize=os.environ.get('QUEUE_MAXSIZE', 1000))
     sender = _get_sender(blocking_queue)
-    _serve(sock, blocking_queue, sender)
+    _serve(sock, blocking_queue, sender, debug=debug)
 
 
-def _serve(sock, blocking_queue, sender):
+def _serve(sock, blocking_queue, sender, debug=False):
     sender.start()
     while True:
         data, address = sock.recvfrom(65535)
         message = SentryMessage.create_from_udp(data)
         blocking_queue.put(message)
-        sys.stdout.write('{host}:{port} [{date}]\n'.format(
-            host=address[0], port=address[1], date=datetime.datetime.now()))
+        if debug:
+            sys.stdout.write('{host}:{port} [{date}]\n'.format(
+                host=address[0], port=address[1],
+                date=datetime.datetime.now()))
 
 
 def _get_sender(blocking_queue):
