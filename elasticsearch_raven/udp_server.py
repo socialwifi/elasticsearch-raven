@@ -45,8 +45,7 @@ def _run_server(sock, debug=False):
     handler.start()
     sender.start()
     try:
-        exception = exception_queue.get()
-        raise exception
+        raise exception_queue.get()
     except KeyboardInterrupt:
         pending_logs.join()
 
