@@ -89,14 +89,11 @@ def retry_loop(timeout, delay, back_off=1.0):
     def retry(exception):
         exceptions.append(exception)
 
-    while True:
+    while time.time() - start_time <= timeout:
+        exceptions.clear()
         yield retry
         if not exceptions:
             return
-        if time.time() - start_time > timeout:
-            break
-        else:
-            exceptions.clear()
         time.sleep(delay)
         delay *= back_off
 
