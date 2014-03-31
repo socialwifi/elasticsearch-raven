@@ -38,20 +38,24 @@ def get_socket(ip, port):
 
 def _run_server(sock, debug=False):
     blocking_queue = queue.Queue(maxsize=os.environ.get('QUEUE_MAXSIZE', 1000))
+    handler = _get_handler(sock, blocking_queue, debug=debug)
     sender = _get_sender(blocking_queue)
-    _serve(sock, blocking_queue, sender, debug=debug)
-
-
-def _serve(sock, blocking_queue, sender, debug=False):
+    handler.start()
     sender.start()
-    while True:
-        data, address = sock.recvfrom(65535)
-        message = SentryMessage.create_from_udp(data)
-        blocking_queue.put(message)
-        if debug:
-            sys.stdout.write('{host}:{port} [{date}]\n'.format(
-                host=address[0], port=address[1],
-                date=datetime.datetime.now()))
+
+
+def _get_handler(sock, blocking_queue, debug=False):
+    def _handle():
+        while True:
+            data, address = sock.recvfrom(65535)
+            message = SentryMessage.create_from_udp(data)
+            blocking_queue.put(message)
+            if debug:
+                sys.stdout.write('{host}:{port} [{date}]\n'.format(
+                    host=address[0], port=address[1],
+                    date=datetime.datetime.now()))
+    handler = threading.Thread(target=_handle)
+    return handler
 
 
 def _get_sender(blocking_queue):
