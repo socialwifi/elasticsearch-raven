@@ -2,12 +2,12 @@ import os
 from queue import Queue
 from threading import Thread
 
+from elasticsearch_raven import configuration
 from elasticsearch_raven.transport import ElasticsearchTransport
 from elasticsearch_raven.transport import SentryMessage
 
-host = os.environ.get('ELASTICSEARCH_HOST', 'localhost:9200')
-use_ssl = os.environ.get('USE_SSL', False)
-transport = ElasticsearchTransport(host, use_ssl)
+transport = ElasticsearchTransport(configuration['host'],
+                                   configuration['use_ssl'])
 blocking_queue = Queue()
 
 

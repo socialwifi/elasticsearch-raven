@@ -1,11 +1,11 @@
 import argparse
 import datetime
-import os
 import queue
 import socket
 import sys
 import threading
 
+from elasticsearch_raven import configuration
 from elasticsearch_raven.transport import ElasticsearchTransport
 from elasticsearch_raven.transport import SentryMessage
 
@@ -37,7 +37,7 @@ def get_socket(ip, port):
 
 
 def _run_server(sock, debug=False):
-    blocking_queue = queue.Queue(maxsize=os.environ.get('QUEUE_MAXSIZE', 1000))
+    blocking_queue = queue.Queue(configuration['queue_maxsize'])
     exception_queue = queue.Queue()
     handler = _get_handler(sock, blocking_queue, exception_queue, debug=debug)
     sender = _get_sender(blocking_queue, exception_queue)
@@ -71,9 +71,8 @@ def _get_handler(sock, blocking_queue, exception_queue, debug=False):
 
 
 def _get_sender(blocking_queue, exception_queue):
-    host = os.environ.get('ELASTICSEARCH_HOST', 'localhost:9200')
-    use_ssl = bool(os.environ.get('USE_SSL', False))
-    transport = ElasticsearchTransport(host, use_ssl)
+    transport = ElasticsearchTransport(configuration['host'],
+                                       configuration['use_ssl'])
 
     def _send():
         try:
