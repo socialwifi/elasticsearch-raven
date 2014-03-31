@@ -12,8 +12,12 @@ from elasticsearch_raven.transport import SentryMessage
 
 def run_server():
     args = _parse_args()
-    sock = get_socket(args.ip, args.port)
-    if sock:
+    try:
+        sock = get_socket(args.ip, args.port)
+    except socket.gaierror:
+        sys.stdout.write('Wrong hostname.\n')
+        sys.exit(1)
+    else:
         _run_server(sock, args.debug)
 
 
@@ -29,11 +33,8 @@ def _parse_args():
 
 def get_socket(ip, port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        sock.bind((ip, int(port)))
-        return sock
-    except socket.gaierror:
-        sys.stdout.write('Wrong hostname\n')
+    sock.bind((ip, int(port)))
+    return sock
 
 
 def _run_server(sock, debug=False):
