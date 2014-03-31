@@ -1,4 +1,5 @@
 import base64
+import collections
 import datetime
 import json
 import logging
@@ -14,20 +15,21 @@ elasticsearch_logger = logging.getLogger('elasticsearch')
 elasticsearch_logger.setLevel(logging.ERROR)
 
 
-class Message:
-    def __init__(self, headers, body):
-        self.body = body
-        self.headers = headers
+BaseMessage = collections.namedtuple('BaseMessage', ['headers', 'body'])
 
+
+class Message(BaseMessage):
     @classmethod
     def from_message(cls, message):
         return cls(message.headers, message.body)
+
+    def decode_body(self):
+        return self.body
 
 
 class SentryMessage(Message):
     def __init__(self, headers, body):
         super().__init__(headers, body)
-        self._compressed = True
 
     @classmethod
     def create_from_udp(cls, data):
@@ -48,19 +50,14 @@ class SentryMessage(Message):
                       r'(?P<sentry_secret>[^=]+)$', raw_headers)
         return m.groupdict()
 
-    @property
-    def body(self):
-        if self._compressed:
-            self._body = json.loads(
-                zlib.decompress(self._body).decode('utf-8'))
-            self._compressed = False
-        return self._body
+    def decode_body(self):
+        return json.loads(zlib.decompress(self.body).decode('utf-8'))
 
 
 class ElasticsearchMessage(Message):
     def __init__(self, headers, body):
         super().__init__(headers, body)
-        postfix_encoded_data(self._body)
+        postfix_encoded_data(self.body)
 
 
 class ElasticsearchTransport:
@@ -70,7 +67,8 @@ class ElasticsearchTransport:
 
     def send(self, message):
         message = ElasticsearchMessage.from_message(message)
-        dated_index = message.body['project'].format(datetime.datetime.now())
+        message_body = message.decode_body()
+        dated_index = message_body['project'].format(datetime.datetime.now())
         http_auth = '{}:{}'.format(message.headers['sentry_key'],
                                    message.headers['sentry_secret'])
         connection = elasticsearch.Elasticsearch(hosts=[self._host],
@@ -78,7 +76,7 @@ class ElasticsearchTransport:
                                                  use_ssl=self._use_ssl)
         for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
             try:
-                connection.index(body=message.body, index=dated_index,
+                connection.index(body=message_body, index=dated_index,
                                  doc_type='raven-log')
             except elasticsearch.exceptions.ConnectionError as e:
                 retry(e)
