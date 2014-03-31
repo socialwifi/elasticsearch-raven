@@ -1,11 +1,16 @@
 import base64
 import datetime
 import json
+import logging
 import re
+import time
 import zlib
 
 import elasticsearch
 from elasticsearch_raven.postfix import postfix_encoded_data
+
+elasticsearch_logger = logging.getLogger('elasticsearch')
+elasticsearch_logger.setLevel(logging.ERROR)
 
 
 class Message:
@@ -79,5 +84,30 @@ class ElasticsearchTransport:
         connection = elasticsearch.Elasticsearch(hosts=[self._host],
                                                  http_auth=http_auth,
                                                  use_ssl=self._use_ssl)
-        connection.index(body=message.body, index=dated_index,
-                         doc_type='raven-log')
+        for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
+            try:
+                connection.index(body=message.body, index=dated_index,
+                                 doc_type='raven-log')
+            except elasticsearch.exceptions.ConnectionError as e:
+                retry(e)
+
+
+def retry_loop(timeout, delay, back_off=1.0):
+    start_time = time.time()
+    exceptions = []
+
+    def retry(exception):
+        exceptions.append(exception)
+
+    while True:
+        yield retry
+        if not exceptions:
+            return
+        if time.time() - start_time > timeout:
+            break
+        else:
+            exceptions.clear()
+        time.sleep(delay)
+        delay *= back_off
+
+    raise exceptions[0]
