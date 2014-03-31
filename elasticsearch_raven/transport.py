@@ -16,20 +16,12 @@ elasticsearch_logger.setLevel(logging.ERROR)
 
 class Message:
     def __init__(self, headers, body):
-        self._body = body
-        self._headers = headers
+        self.body = body
+        self.headers = headers
 
     @classmethod
     def from_message(cls, message):
         return cls(message.headers, message.body)
-
-    @property
-    def body(self):
-        return self._body
-
-    @property
-    def headers(self):
-        return self._headers
 
 
 class SentryMessage(Message):
