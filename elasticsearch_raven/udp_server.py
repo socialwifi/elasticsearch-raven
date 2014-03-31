@@ -37,32 +37,32 @@ def get_socket(ip, port):
 
 
 def _run_server(sock, debug=False):
-    blocking_queue = queue.Queue(configuration['queue_maxsize'])
+    pending_logs = queue.Queue(configuration['queue_maxsize'])
     exception_queue = queue.Queue()
-    handler = _get_handler(sock, blocking_queue, exception_queue, debug=debug)
-    sender = _get_sender(blocking_queue, exception_queue)
+    handler = _get_handler(sock, pending_logs, exception_queue, debug=debug)
+    sender = _get_sender(pending_logs, exception_queue)
     handler.start()
     sender.start()
     try:
         exception = exception_queue.get()
         raise exception
     except KeyboardInterrupt:
-        blocking_queue.join()
+        pending_logs.join()
 
 
-def _get_handler(sock, blocking_queue, exception_queue, debug=False):
+def _get_handler(sock, pending_logs, exception_queue, debug=False):
     def _handle():
         try:
             while True:
                 data, address = sock.recvfrom(65535)
                 message = SentryMessage.create_from_udp(data)
-                blocking_queue.put(message)
+                pending_logs.put(message)
                 if debug:
                     sys.stdout.write('{host}:{port} [{date}]\n'.format(
                         host=address[0], port=address[1],
                         date=datetime.datetime.now()))
         except Exception as e:
-            blocking_queue.join()
+            pending_logs.join()
             exception_queue.put(e)
 
     handler = threading.Thread(target=_handle)
@@ -70,16 +70,16 @@ def _get_handler(sock, blocking_queue, exception_queue, debug=False):
     return handler
 
 
-def _get_sender(blocking_queue, exception_queue):
+def _get_sender(pending_logs, exception_queue):
     transport = ElasticsearchTransport(configuration['host'],
                                        configuration['use_ssl'])
 
     def _send():
         try:
             while True:
-                message = blocking_queue.get()
+                message = pending_logs.get()
                 transport.send(message)
-                blocking_queue.task_done()
+                pending_logs.task_done()
         except Exception as e:
             exception_queue.put(e)
 
