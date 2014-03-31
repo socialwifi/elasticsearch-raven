@@ -4,7 +4,6 @@ import datetime
 import json
 import logging
 import re
-import time
 import zlib
 
 import elasticsearch
@@ -74,27 +73,5 @@ class ElasticsearchTransport:
         connection = elasticsearch.Elasticsearch(hosts=[self._host],
                                                  http_auth=http_auth,
                                                  use_ssl=self._use_ssl)
-        for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
-            try:
-                connection.index(body=message_body, index=dated_index,
-                                 doc_type='raven-log')
-            except elasticsearch.exceptions.ConnectionError as e:
-                retry(e)
-
-
-def retry_loop(timeout, delay, back_off=1.0):
-    start_time = time.time()
-    exceptions = []
-
-    def retry(exception):
-        exceptions.append(exception)
-
-    while time.time() - start_time <= timeout:
-        exceptions.clear()
-        yield retry
-        if not exceptions:
-            return
-        time.sleep(delay)
-        delay *= back_off
-
-    raise exceptions[0]
+        connection.index(body=message_body, index=dated_index,
+                         doc_type='raven-log')

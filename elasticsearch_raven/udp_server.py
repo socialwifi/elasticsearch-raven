@@ -3,7 +3,10 @@ import datetime
 import queue
 import socket
 import sys
+import time
 import threading
+
+import elasticsearch
 
 from elasticsearch_raven import configuration
 from elasticsearch_raven.transport import ElasticsearchTransport
@@ -82,7 +85,11 @@ def _get_sender(pending_logs, exception_queue):
         try:
             while True:
                 message = pending_logs.get()
-                transport.send(message)
+                for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
+                    try:
+                        transport.send(message)
+                    except elasticsearch.exceptions.ConnectionError as e:
+                        retry(e)
                 pending_logs.task_done()
         except Exception as e:
             exception_queue.put(e)
@@ -90,3 +97,21 @@ def _get_sender(pending_logs, exception_queue):
     sender = threading.Thread(target=_send)
     sender.daemon = True
     return sender
+
+
+def retry_loop(timeout, delay, back_off=1.0):
+    start_time = time.time()
+    exceptions = []
+
+    def retry(exception):
+        exceptions.append(exception)
+
+    while time.time() - start_time <= timeout:
+        exceptions.clear()
+        yield retry
+        if not exceptions:
+            return
+        time.sleep(delay)
+        delay *= back_off
+
+    raise exceptions[0]
