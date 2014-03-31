@@ -36,18 +36,17 @@ class SentryMessage(Message):
         data = base64.b64decode(data)
         return cls(headers, data)
 
-    @staticmethod
-    def parse_headers(unparsed_headers):
-        m = re.search(r'sentry_key=(?P<sentry_key>[^=]+), sentry_secret='
-                      r'(?P<sentry_secret>[^=]+)$', unparsed_headers)
-        return m.groupdict()
-
-
     @classmethod
     def create_from_http(cls, unparsed_headers, data):
         headers = cls.parse_headers(unparsed_headers)
         data = base64.b64decode(data)
         return cls(headers, data)
+
+    @staticmethod
+    def parse_headers(unparsed_headers):
+        m = re.search(r'sentry_key=(?P<sentry_key>[^=]+), sentry_secret='
+                      r'(?P<sentry_secret>[^=]+)$', unparsed_headers)
+        return m.groupdict()
 
     @property
     def body(self):
