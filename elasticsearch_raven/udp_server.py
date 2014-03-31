@@ -47,7 +47,11 @@ def _run_server(sock, debug=False):
     try:
         raise exception_queue.get()
     except KeyboardInterrupt:
-        pending_logs.join()
+        while pending_logs.unfinished_tasks:
+            try:
+                raise exception_queue.get(timeout=1)
+            except queue.Empty:
+                pass
 
 
 def _get_handler(sock, pending_logs, exception_queue, debug=False):
