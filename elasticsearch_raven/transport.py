@@ -7,6 +7,7 @@ import time
 import zlib
 
 import elasticsearch
+
 from elasticsearch_raven.postfix import postfix_encoded_data
 
 elasticsearch_logger = logging.getLogger('elasticsearch')
