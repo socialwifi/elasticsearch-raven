@@ -43,8 +43,11 @@ def _run_server(sock, debug=False):
     sender = _get_sender(blocking_queue, exception_queue)
     handler.start()
     sender.start()
-    exception = exception_queue.get()
-    raise exception
+    try:
+        exception = exception_queue.get()
+        raise exception
+    except KeyboardInterrupt:
+        blocking_queue.join()
 
 
 def _get_handler(sock, blocking_queue, exception_queue, debug=False):
