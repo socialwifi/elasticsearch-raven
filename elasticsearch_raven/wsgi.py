@@ -13,9 +13,9 @@ blocking_queue = Queue()
 
 def send():
     while True:
-        message = blocking_queue.get()
+        message = pending_logs.get()
         transport.send(message)
-        blocking_queue.task_done()
+        pending_logs.task_done()
 
 
 sender = Thread(target=send)
@@ -25,7 +25,7 @@ sender.start()
 def application(environ, start_response):
     length = int(environ.get('CONTENT_LENGTH', '0'))
     data = environ['wsgi.input'].read(length)
-    blocking_queue.put(SentryMessage.create_from_http(
+    pending_logs.put(SentryMessage.create_from_http(
         environ['HTTP_X_SENTRY_AUTH'], data))
 
     status = '200 OK'
