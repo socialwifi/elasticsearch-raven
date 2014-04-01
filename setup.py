@@ -1,6 +1,5 @@
 from setuptools import setup
 
-
 setup(
     name='Elasticsearch-Raven',
     version='0.1.1',
@@ -10,8 +9,8 @@ setup(
     packages=['elasticsearch_raven'],
     scripts=['bin/elasticsearch-raven.py'],
     license='MIT',
-    description='Proxy that allows to log from raven to elasticsearch.',
+    description='Proxy that allows to send logs from Raven to Elasticsearch.',
     long_description=open('README.md').read(),
     install_requires=['elasticsearch'],
-    test_suite='tests'
+    test_suite='tests',
 )
