@@ -8,6 +8,7 @@ import zlib
 
 import elasticsearch
 
+from elasticsearch_raven import exceptions
 from elasticsearch_raven.postfix import postfix_encoded_data
 
 elasticsearch_logger = logging.getLogger('elasticsearch')
@@ -20,7 +21,10 @@ BaseMessage = collections.namedtuple('BaseMessage', ['headers', 'body'])
 class SentryMessage(BaseMessage):
     @classmethod
     def create_from_udp(cls, data):
-        byte_headers, data = data.split(b'\n\n')
+        try:
+            byte_headers, data = data.split(b'\n\n')
+        except ValueError:
+            raise exceptions.DamagedSentryMessageError
         headers = cls.parse_headers(str(byte_headers.decode('utf-8')))
         data = base64.b64decode(data)
         return cls(headers, data)
@@ -33,12 +37,18 @@ class SentryMessage(BaseMessage):
 
     @staticmethod
     def parse_headers(raw_headers):
-        m = re.search(r'sentry_key=(?P<sentry_key>[^=]+), sentry_secret='
-                      r'(?P<sentry_secret>[^=]+)$', raw_headers)
-        return m.groupdict()
+        match = re.search(r'sentry_key=(?P<sentry_key>[^, =]+), sentry_secret='
+                          r'(?P<sentry_secret>[^, =]+)$', raw_headers)
+        if match:
+            return match.groupdict()
+        else:
+            raise exceptions.BadSentryMessageHeaderError
 
     def decode_body(self):
-        return json.loads(zlib.decompress(self.body).decode('utf-8'))
+        try:
+            return json.loads(zlib.decompress(self.body).decode('utf-8'))
+        except (zlib.error, ValueError):
+            raise exceptions.DamagedSentryMessageBodyError
 
 
 class ElasticsearchTransport:
