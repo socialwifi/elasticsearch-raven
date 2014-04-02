@@ -84,19 +84,32 @@ def get_sender(transport, pending_logs, exception_queue):
     def _send():
         try:
             while True:
-                message = pending_logs.get()
-                for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
-                    try:
-                        transport.send(message)
-                    except elasticsearch.exceptions.ConnectionError as e:
-                        retry(e)
-                pending_logs.task_done()
+                _send_message(transport, pending_logs)
         except Exception as e:
             exception_queue.put(e)
 
     sender = threading.Thread(target=_send)
     sender.daemon = True
     return sender
+
+
+def _send_message(transport, pending_logs):
+    message = pending_logs.get()
+    try:
+        for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
+            try:
+                transport.send(message)
+            except elasticsearch.exceptions.ConnectionError as e:
+                retry(e)
+    except elasticsearch.exceptions.TransportError as e:
+        connection = elasticsearch.Elasticsearch(
+            hosts=[configuration['host']],
+            use_ssl=configuration['use_ssl'],
+            http_auth=configuration['error_http_auth'])
+        body = {'message': str(message), 'error': str(e)}
+        connection.index(index='elasticsearch-raven-error', body=body,
+                         doc_type='elasticsearch-raven-log')
+    pending_logs.task_done()
 
 
 def retry_loop(timeout, delay, back_off=1.0):

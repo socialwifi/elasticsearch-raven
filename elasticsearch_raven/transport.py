@@ -50,6 +50,9 @@ class SentryMessage(BaseMessage):
         except (zlib.error, ValueError):
             raise exceptions.DamagedSentryMessageBodyError
 
+    def __unicode__(self):
+        return str({'headers': str(self.headers), 'body': str(self.body)})
+
 
 class ElasticsearchTransport:
     def __init__(self, host, use_ssl=False):
