@@ -2,12 +2,12 @@ import queue
 
 from elasticsearch_raven import configuration
 from elasticsearch_raven.transport import SentryMessage
-from elasticsearch_raven.udp_server import _get_sender
+from elasticsearch_raven.udp_server import get_sender
 
 pending_logs = queue.Queue(configuration['queue_maxsize'])
 exception_queue = queue.Queue()
 
-sender = _get_sender(pending_logs, exception_queue)
+sender = get_sender(pending_logs, exception_queue)
 sender.start()
 
 

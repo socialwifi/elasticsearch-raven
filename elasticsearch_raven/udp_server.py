@@ -21,7 +21,11 @@ def run_server():
         sys.stdout.write('Wrong hostname.\n')
         sys.exit(1)
     else:
-        _run_server(sock, args.debug)
+        transport = ElasticsearchTransport(configuration['host'],
+                                           configuration['use_ssl'])
+        pending_logs = queue.Queue(configuration['queue_maxsize'])
+        exception_queue = queue.Queue()
+        _run_server(sock, pending_logs, exception_queue, transport, args.debug)
 
 
 def _parse_args():
@@ -40,11 +44,9 @@ def get_socket(ip, port):
     return sock
 
 
-def _run_server(sock, debug=False):
-    pending_logs = queue.Queue(configuration['queue_maxsize'])
-    exception_queue = queue.Queue()
-    handler = _get_handler(sock, pending_logs, exception_queue, debug=debug)
-    sender = _get_sender(pending_logs, exception_queue)
+def _run_server(sock, pending_logs, exception_queue, transport, debug=False):
+    handler = get_handler(sock, pending_logs, exception_queue, debug=debug)
+    sender = get_sender(transport, pending_logs, exception_queue)
     handler.start()
     sender.start()
     try:
@@ -57,7 +59,7 @@ def _run_server(sock, debug=False):
                 pass
 
 
-def _get_handler(sock, pending_logs, exception_queue, debug=False):
+def get_handler(sock, pending_logs, exception_queue, debug=False):
     def _handle():
         try:
             while True:
@@ -77,9 +79,7 @@ def _get_handler(sock, pending_logs, exception_queue, debug=False):
     return handler
 
 
-def _get_sender(pending_logs, exception_queue):
-    transport = ElasticsearchTransport(configuration['host'],
-                                       configuration['use_ssl'])
+def get_sender(transport, pending_logs, exception_queue):
 
     def _send():
         try:
