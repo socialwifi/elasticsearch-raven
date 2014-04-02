@@ -52,6 +52,7 @@ def _run_server(sock, pending_logs, exception_queue, transport, debug=False):
     try:
         raise exception_queue.get()
     except KeyboardInterrupt:
+        sock.close()
         try:
             while pending_logs.unfinished_tasks:
                 try:
@@ -74,6 +75,7 @@ def get_handler(sock, pending_logs, exception_queue, debug=False):
                         host=address[0], port=address[1],
                         date=datetime.datetime.now()))
         except Exception as e:
+            sock.close()
             pending_logs.join()
             exception_queue.put(e)
 
