@@ -52,11 +52,14 @@ def _run_server(sock, pending_logs, exception_queue, transport, debug=False):
     try:
         raise exception_queue.get()
     except KeyboardInterrupt:
-        while pending_logs.unfinished_tasks:
-            try:
-                raise exception_queue.get(timeout=1)
-            except queue.Empty:
-                pass
+        try:
+            while pending_logs.unfinished_tasks:
+                try:
+                    raise exception_queue.get(timeout=1)
+                except queue.Empty:
+                    pass
+        except KeyboardInterrupt:
+            pass
 
 
 def get_handler(sock, pending_logs, exception_queue, debug=False):
