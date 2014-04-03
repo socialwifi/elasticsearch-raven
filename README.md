@@ -1,5 +1,7 @@
 #elasticsearch-raven
 
+[![Build Status](https://travis-ci.org/pozytywnie/elasticsearch-raven.svg?branch=master)](https://travis-ci.org/pozytywnie/elasticsearch-raven)
+
 Proxy that allows to log from raven to elasticsearch.
 
 ##Installation
