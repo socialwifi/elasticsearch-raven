@@ -37,3 +37,23 @@ class RunServerTest(TestCase):
         self.assertRaises(SystemExit, udp_server.run_server)
         self.assertEqual([mock.call.write('Wrong hostname.\n')],
                          stdout.mock_calls)
+
+
+class ParseArgsTest(TestCase):
+    @mock.patch('argparse._sys')
+    def test_ip(self, sys):
+        sys.argv = ['test', '192.168.1.1', '8888']
+        results = udp_server._parse_args()
+        self.assertEqual('192.168.1.1', results.ip)
+
+    @mock.patch('argparse._sys')
+    def test_port(self, sys):
+        sys.argv = ['test', '192.168.1.1', '8888']
+        results = udp_server._parse_args()
+        self.assertEqual(8888, results.port)
+
+    @mock.patch('argparse._sys')
+    def test_debug(self, sys):
+        sys.argv = ['test', '192.168.1.1', '8888', '--debug']
+        results = udp_server._parse_args()
+        self.assertEqual(True, results.debug)
