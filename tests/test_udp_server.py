@@ -1,4 +1,6 @@
+import datetime
 import socket
+import threading
 from unittest import TestCase
 
 try:
@@ -95,3 +97,59 @@ class _RunServerTest(TestCase):
                                self.exception_queue, self.transport)
         print(self.exception_queue.mock_calls)
         self.assertEqual([mock.call.close()], self.sock.mock_calls)
+
+
+class GetHandlerTest(TestCase):
+    def setUp(self):
+        self.sock = mock.Mock()
+        self.pending_logs = mock.Mock()
+        self.exception_queue = mock.Mock()
+        self.exception = Exception('test')
+        self.sock.recvfrom.side_effect = [({}, ('192.168.1.1', 8888)),
+                                          self.exception]
+
+    @mock.patch('elasticsearch_raven.udp_server.datetime')
+    @mock.patch('elasticsearch_raven.udp_server.SentryMessage')
+    @mock.patch('sys.stdout')
+    def test_debug(self, stdout, SentryMessage, datetime_mock):
+        datetime_mock.datetime.now.return_value = datetime.datetime(2014, 1, 1)
+        self.run_handler_function(debug=True)
+
+        self.assertEqual(
+            [mock.call.write('192.168.1.1:8888 [2014-01-01 00:00:00]\n')],
+            stdout.mock_calls)
+
+    def run_handler_function(self, **kwargs):
+        thread = udp_server.get_handler(self.sock, self.pending_logs,
+                                        self.exception_queue, **kwargs)
+        if hasattr(thread, '_target'):
+            thread._target()
+        else:
+            thread._Thread__target()
+
+    @mock.patch('elasticsearch_raven.udp_server.SentryMessage')
+    def test_exception(self, SentryMessage):
+        self.run_handler_function()
+
+        self.assertEqual([mock.call.put(self.exception)],
+                         self.exception_queue.mock_calls)
+
+    @mock.patch('elasticsearch_raven.udp_server.SentryMessage')
+    def test_put_result_and_join_on_queue(self, SentryMessage):
+        self.run_handler_function()
+        self.assertEqual([mock.call.put(SentryMessage.create_from_udp()),
+                          mock.call.join()], self.pending_logs.mock_calls)
+
+    def test_daemon_thread(self):
+        result = udp_server.get_handler(self.sock, self.pending_logs,
+                                        self.exception_queue)
+        self.assertIsInstance(result, threading.Thread)
+        self.assertEqual(True, result.daemon)
+
+    @mock.patch('elasticsearch_raven.udp_server.SentryMessage')
+    def test_close_socket(self, SentryMessage):
+        self.sock.recvfrom.side_effect = Exception
+        self.run_handler_function()
+
+        self.assertEqual([mock.call.recvfrom(65535), mock.call.close()],
+                         self.sock.mock_calls)
