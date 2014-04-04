@@ -1,4 +1,5 @@
 import base64
+import collections
 import datetime
 import json
 import logging
@@ -7,68 +8,45 @@ import time
 import zlib
 
 import elasticsearch
+
+from elasticsearch_raven import exceptions
 from elasticsearch_raven.postfix import postfix_encoded_data
 
 elasticsearch_logger = logging.getLogger('elasticsearch')
 elasticsearch_logger.setLevel(logging.ERROR)
 
 
-class Message:
-    def __init__(self, headers, body):
-        self._body = body
-        self._headers = headers
-
-    @classmethod
-    def from_message(cls, message):
-        return cls(message.headers, message.body)
-
-    @property
-    def body(self):
-        return self._body
-
-    @property
-    def headers(self):
-        return self._headers
-
-
-class SentryMessage(Message):
-    def __init__(self, headers, body):
-        super().__init__(headers, body)
-        self._compressed = True
-
+class SentryMessage(collections.namedtuple('SentryMessage', ['headers', 'body'])):
     @classmethod
     def create_from_udp(cls, data):
-        byte_headers, data = data.split(b'\n\n')
+        try:
+            byte_headers, data = data.split(b'\n\n')
+        except ValueError:
+            raise exceptions.DamagedSentryMessageError
         headers = cls.parse_headers(str(byte_headers.decode('utf-8')))
         data = base64.b64decode(data)
         return cls(headers, data)
 
-    @staticmethod
-    def parse_headers(unparsed_headers):
-        m = re.search(r'sentry_key=(?P<sentry_key>[^=]+), sentry_secret='
-                      r'(?P<sentry_secret>[^=]+)$', unparsed_headers)
-        return m.groupdict()
-
-
     @classmethod
-    def create_from_http(cls, unparsed_headers, data):
-        headers = cls.parse_headers(unparsed_headers)
+    def create_from_http(cls, raw_headers, data):
+        headers = cls.parse_headers(raw_headers)
         data = base64.b64decode(data)
         return cls(headers, data)
 
-    @property
-    def body(self):
-        if self._compressed:
-            self._body = json.loads(
-                zlib.decompress(self._body).decode('utf-8'))
-            self._compressed = False
-        return self._body
+    @staticmethod
+    def parse_headers(raw_headers):
+        match = re.search(r'sentry_key=(?P<sentry_key>[^, =]+), sentry_secret='
+                          r'(?P<sentry_secret>[^, =]+)$', raw_headers)
+        if match:
+            return match.groupdict()
+        else:
+            raise exceptions.BadSentryMessageHeaderError
 
-
-class ElasticsearchMessage(Message):
-    def __init__(self, headers, body):
-        super().__init__(headers, body)
-        postfix_encoded_data(self._body)
+    def decode_body(self):
+        try:
+            return json.loads(zlib.decompress(self.body).decode('utf-8'))
+        except (zlib.error, ValueError):
+            raise exceptions.DamagedSentryMessageBodyError
 
 
 class ElasticsearchTransport:
@@ -77,7 +55,7 @@ class ElasticsearchTransport:
         self._use_ssl = use_ssl
 
     def send(self, message):
-        message = ElasticsearchMessage.from_message(message)
+        postfix_encoded_data(message.body)
         dated_index = message.body['project'].format(datetime.datetime.now())
         http_auth = '{}:{}'.format(message.headers['sentry_key'],
                                    message.headers['sentry_secret'])

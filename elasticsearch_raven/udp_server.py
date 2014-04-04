@@ -1,20 +1,35 @@
 import argparse
 import datetime
-import os
-import queue
 import socket
 import sys
+import time
 import threading
 
+try:
+    import queue
+except ImportError:
+    import Queue as queue
+
+import elasticsearch
+
+from elasticsearch_raven import configuration
 from elasticsearch_raven.transport import ElasticsearchTransport
 from elasticsearch_raven.transport import SentryMessage
 
 
 def run_server():
     args = _parse_args()
-    sock = get_socket(args.ip, args.port)
-    if sock:
-        _run_server(sock, args.debug)
+    try:
+        sock = get_socket(args.ip, args.port)
+    except socket.gaierror:
+        sys.stdout.write('Wrong hostname.\n')
+        sys.exit(1)
+    else:
+        transport = ElasticsearchTransport(configuration['host'],
+                                           configuration['use_ssl'])
+        pending_logs = queue.Queue(configuration['queue_maxsize'])
+        exception_queue = queue.Queue()
+        _run_server(sock, pending_logs, exception_queue, transport, args.debug)
 
 
 def _parse_args():
@@ -29,40 +44,43 @@ def _parse_args():
 
 def get_socket(ip, port):
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    try:
-        sock.bind((ip, int(port)))
-        return sock
-    except socket.gaierror:
-        sys.stdout.write('Wrong hostname\n')
+    sock.bind((ip, int(port)))
+    return sock
 
 
-def _run_server(sock, debug=False):
-    blocking_queue = queue.Queue(maxsize=os.environ.get('QUEUE_MAXSIZE', 1000))
-    exception_queue = queue.Queue()
-    handler = _get_handler(sock, blocking_queue, exception_queue, debug=debug)
-    sender = _get_sender(blocking_queue, exception_queue)
+def _run_server(sock, pending_logs, exception_queue, transport, debug=False):
+    handler = get_handler(sock, pending_logs, exception_queue, debug=debug)
+    sender = get_sender(transport, pending_logs, exception_queue)
     handler.start()
     sender.start()
     try:
-        exception = exception_queue.get()
-        raise exception
+        raise exception_queue.get()
     except KeyboardInterrupt:
-        blocking_queue.join()
+        sock.close()
+        try:
+            while pending_logs.unfinished_tasks:
+                try:
+                    raise exception_queue.get(timeout=1)
+                except queue.Empty:
+                    pass
+        except KeyboardInterrupt:
+            pass
 
 
-def _get_handler(sock, blocking_queue, exception_queue, debug=False):
+def get_handler(sock, pending_logs, exception_queue, debug=False):
     def _handle():
         try:
             while True:
                 data, address = sock.recvfrom(65535)
                 message = SentryMessage.create_from_udp(data)
-                blocking_queue.put(message)
+                pending_logs.put(message)
                 if debug:
                     sys.stdout.write('{host}:{port} [{date}]\n'.format(
                         host=address[0], port=address[1],
                         date=datetime.datetime.now()))
         except Exception as e:
-            blocking_queue.join()
+            sock.close()
+            pending_logs.join()
             exception_queue.put(e)
 
     handler = threading.Thread(target=_handle)
@@ -70,20 +88,52 @@ def _get_handler(sock, blocking_queue, exception_queue, debug=False):
     return handler
 
 
-def _get_sender(blocking_queue, exception_queue):
-    host = os.environ.get('ELASTICSEARCH_HOST', 'localhost:9200')
-    use_ssl = bool(os.environ.get('USE_SSL', False))
-    transport = ElasticsearchTransport(host, use_ssl)
+def get_sender(transport, pending_logs, exception_queue):
 
     def _send():
         try:
             while True:
-                message = blocking_queue.get()
-                transport.send(message)
-                blocking_queue.task_done()
+                _send_message(transport, pending_logs)
         except Exception as e:
             exception_queue.put(e)
 
     sender = threading.Thread(target=_send)
     sender.daemon = True
     return sender
+
+
+def _send_message(transport, pending_logs):
+    message = pending_logs.get()
+    try:
+        for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
+            try:
+                transport.send(message)
+            except elasticsearch.exceptions.ConnectionError as e:
+                retry(e)
+    except elasticsearch.exceptions.TransportError as e:
+        connection = elasticsearch.Elasticsearch(
+            hosts=[configuration['host']],
+            use_ssl=configuration['use_ssl'],
+            http_auth=configuration['error_http_auth'])
+        body = {'message': str(message), 'error': str(e)}
+        connection.index(index='elasticsearch-raven-error', body=body,
+                         doc_type='elasticsearch-raven-log')
+    pending_logs.task_done()
+
+
+def retry_loop(timeout, delay, back_off=1.0):
+    start_time = time.time()
+    exceptions = set()
+
+    def retry(exception):
+        exceptions.add(exception)
+    yield retry
+    while time.time() - start_time <= timeout:
+        if not exceptions:
+            return
+        time.sleep(delay)
+        delay *= back_off
+        exceptions.clear()
+        yield retry
+
+    raise exceptions.pop()

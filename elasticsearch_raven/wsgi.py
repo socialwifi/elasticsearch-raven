@@ -1,28 +1,23 @@
-import os
-from queue import Queue
-from threading import Thread
+import queue
 
-from elasticsearch_raven.transport import ElasticsearchTransport
+from elasticsearch_raven import configuration
 from elasticsearch_raven.transport import SentryMessage
+from elasticsearch_raven.udp_server import get_sender
 
-host = os.environ.get('ELASTICSEARCH_HOST', 'localhost:9200')
-use_ssl = os.environ.get('USE_SSL', False)
-transport = ElasticsearchTransport(host, use_ssl)
-blocking_queue = Queue()
+pending_logs = queue.Queue(configuration['queue_maxsize'])
+exception_queue = queue.Queue()
 
-
-def send():
-    while True:
-        message = pending_logs.get()
-        transport.send(message)
-        pending_logs.task_done()
-
-
-sender = Thread(target=send)
+sender = get_sender(pending_logs, exception_queue)
 sender.start()
 
 
 def application(environ, start_response):
+    try:
+        exception = exception_queue.get_nowait()
+    except queue.Empty:
+        pass
+    else:
+        raise exception
     length = int(environ.get('CONTENT_LENGTH', '0'))
     data = environ['wsgi.input'].read(length)
     pending_logs.put(SentryMessage.create_from_http(
