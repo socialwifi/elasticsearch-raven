@@ -8,6 +8,9 @@ try:
 except ImportError:
     import mock
 
+import elasticsearch
+
+from elasticsearch_raven.transport import SentryMessage
 from elasticsearch_raven import udp_server
 
 
@@ -153,3 +156,71 @@ class GetHandlerTest(TestCase):
 
         self.assertEqual([mock.call.recvfrom(65535), mock.call.close()],
                          self.sock.mock_calls)
+
+
+class GetSenderTest(TestCase):
+    def setUp(self):
+        self.pending_logs = mock.Mock()
+        self.exception_queue = mock.Mock()
+        self.transport = mock.Mock()
+
+    def test_exception(self):
+        self.pending_logs.get.return_value = mock.Mock()
+        exception = Exception('test')
+        self.transport.send.side_effect = exception
+        self.run_sender_function()
+        self.assertEqual([mock.call.put(exception)],
+                         self.exception_queue.mock_calls)
+
+    @mock.patch('elasticsearch_raven.udp_server.retry_loop')
+    def test_retry_connection(self, retry_loop):
+        self.pending_logs.get.return_value = mock.Mock()
+        self.pending_logs.task_done.side_effect = Exception('test')
+        exception = elasticsearch.exceptions.ConnectionError('test')
+        self.transport.send.side_effect = exception
+        retry = mock.Mock()
+        retry_loop.return_value = [retry, retry, retry]
+        self.run_sender_function()
+        self.assertEqual([mock.call(exception)]*3, retry.mock_calls)
+        self.assertEqual([mock.call(900, delay=1, back_off=1.5)],
+                         retry_loop.mock_calls)
+
+    def run_sender_function(self):
+        thread = udp_server.get_sender(self.transport, self.pending_logs,
+                                       self.exception_queue)
+        if hasattr(thread, '_target'):
+            thread._target()
+        else:
+            thread._Thread__target()
+
+    def test_daemon_thread(self):
+        result = udp_server.get_sender(self.transport, self.pending_logs,
+                                       self.exception_queue)
+        self.assertIsInstance(result, threading.Thread)
+        self.assertEqual(True, result.daemon)
+
+    def test_task_done(self):
+        self.pending_logs.get.return_value = mock.Mock()
+        self.pending_logs.task_done.side_effect = Exception('test')
+        self.run_sender_function()
+        self.assertEqual([mock.call.get(), mock.call.task_done()],
+                         self.pending_logs.mock_calls)
+
+    @mock.patch('elasticsearch_raven.udp_server.elasticsearch.Elasticsearch')
+    def test_log_transport_error(self, Elasticsearch):
+        exception = elasticsearch.exceptions.TransportError(404, 'test')
+        self.transport.send.side_effect = [exception, Exception]
+        headers = {'test_header': 'foo'},
+        body = {'int': 1}
+        self.pending_logs.get.return_value = SentryMessage(headers, body)
+        self.run_sender_function()
+        self.assertEqual(
+            [mock.call(use_ssl=False, http_auth=None,
+                       hosts=['localhost:9200']),
+             mock.call().__getattr__('index')(body={
+                 'error': "TransportError(404, 'test')",
+                 'message': "SentryMessage(headers=({'test_header': 'foo'},), "
+                            "body={'int': 1})"},
+                               doc_type='elasticsearch-raven-log',
+                               index='elasticsearch-raven-error')],
+            Elasticsearch.mock_calls)
