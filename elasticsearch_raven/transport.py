@@ -55,8 +55,9 @@ class ElasticsearchTransport:
         self._use_ssl = use_ssl
 
     def send(self, message):
-        postfix_encoded_data(message.body)
-        dated_index = message.body['project'].format(datetime.datetime.now())
+        message_body = message.decode_body()
+        postfix_encoded_data(message_body)
+        dated_index = message_body['project'].format(datetime.datetime.now())
         http_auth = '{}:{}'.format(message.headers['sentry_key'],
                                    message.headers['sentry_secret'])
         connection = elasticsearch.Elasticsearch(hosts=[self._host],
@@ -64,7 +65,7 @@ class ElasticsearchTransport:
                                                  use_ssl=self._use_ssl)
         for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
             try:
-                connection.index(body=message.body, index=dated_index,
+                connection.index(body=message_body, index=dated_index,
                                  doc_type='raven-log')
             except elasticsearch.exceptions.ConnectionError as e:
                 retry(e)
