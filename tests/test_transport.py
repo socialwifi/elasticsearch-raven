@@ -66,3 +66,36 @@ class DecodeBodyTest(TestCase):
         message.body = b'x\x9c\xd3\xb5\x05\x00\x00\x99\x00k'
         self.assertRaises(exceptions.DamagedSentryMessageBodyError,
                           SentryMessage.decode_body, message)
+
+
+class CreateFromUDPTest(TestCase):
+    def test_empty(self):
+        arg = b''
+        self.assertRaises(exceptions.DamagedSentryMessageError,
+                          SentryMessage.create_from_udp, arg)
+
+    def test_separator(self):
+        arg = b'\n\n'
+        self.assertRaises(exceptions.BadSentryMessageHeaderError,
+                          SentryMessage.create_from_udp, arg)
+
+    def test_example(self):
+        arg = b'sentry_key=a, sentry_secret=b\n\nYm9keQ=='
+        message = SentryMessage.create_from_udp(arg)
+        self.assertEqual({'sentry_key': 'a', 'sentry_secret': 'b'},
+                         message.headers)
+        self.assertEqual(b'body', message.body)
+
+
+class CreateFromHttpTest(TestCase):
+    def test_empty(self):
+        args = '', ''
+        self.assertRaises(exceptions.BadSentryMessageHeaderError,
+                          SentryMessage.create_from_http, *args)
+
+    def test_example(self):
+        args = 'sentry_key=a, sentry_secret=b', 'Ym9keQ=='
+        message = SentryMessage.create_from_http(*args)
+        self.assertEqual({'sentry_key': 'a', 'sentry_secret': 'b'},
+                         message.headers)
+        self.assertEqual(b'body', message.body)
