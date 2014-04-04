@@ -57,3 +57,41 @@ class ParseArgsTest(TestCase):
         sys.argv = ['test', '192.168.1.1', '8888', '--debug']
         results = udp_server._parse_args()
         self.assertEqual(True, results.debug)
+
+
+class _RunServerTest(TestCase):
+    def setUp(self):
+        self.sock = mock.Mock()
+        self.pending_logs = mock.Mock()
+        self.exception_queue = mock.Mock()
+        self.transport = mock.Mock()
+
+    @mock.patch('elasticsearch_raven.udp_server.get_handler')
+    @mock.patch('elasticsearch_raven.udp_server.get_sender')
+    def test_handler_start(self, get_sender, get_handler):
+        self.exception_queue.get.side_effect = KeyboardInterrupt
+        udp_server._run_server(self.sock, self.pending_logs,
+                               self.exception_queue, self.transport)
+        self.assertEqual([mock.call(
+            self.sock, self.pending_logs, self.exception_queue, debug=False),
+            mock.call().start()], get_handler.mock_calls)
+
+    @mock.patch('elasticsearch_raven.udp_server.get_handler')
+    @mock.patch('elasticsearch_raven.udp_server.get_sender')
+    def test_sender_start(self, get_sender, get_handler):
+        self.exception_queue.get.side_effect = KeyboardInterrupt
+        udp_server._run_server(self.sock, self.pending_logs,
+                               self.exception_queue, self.transport)
+
+        self.assertEqual([mock.call(self.transport, self.pending_logs,
+                                    self.exception_queue),
+                          mock.call().start()], get_sender.mock_calls)
+
+    @mock.patch('elasticsearch_raven.udp_server.get_handler')
+    @mock.patch('elasticsearch_raven.udp_server.get_sender')
+    def test_close_socket(self, get_sender, get_handler):
+        self.exception_queue.get.side_effect = KeyboardInterrupt
+        udp_server._run_server(self.sock, self.pending_logs,
+                               self.exception_queue, self.transport)
+        print(self.exception_queue.mock_calls)
+        self.assertEqual([mock.call.close()], self.sock.mock_calls)
