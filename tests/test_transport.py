@@ -1,6 +1,11 @@
 import string
 from unittest import TestCase
 
+try:
+    from unitetest import mock
+except ImportError:
+    import mock
+
 from elasticsearch_raven import exceptions
 from elasticsearch_raven.transport import SentryMessage
 
@@ -38,3 +43,26 @@ class ParseSentryHeadersTest(TestCase):
         arg = 'sentry_key=a, man_in_the_middle=yes, sentry_secret=b'
         self.assertRaises(exceptions.BadSentryMessageHeaderError,
                           SentryMessage.parse_headers, arg)
+
+
+class DecodeBodyTest(TestCase):
+    def test_empty(self):
+        message = mock.Mock(SentryMessage)
+        message.body = b''
+        self.assertRaises(exceptions.DamagedSentryMessageBodyError,
+                          SentryMessage.decode_body, message)
+
+    def test_example(self):
+        message = mock.Mock(SentryMessage)
+        message.body = b'x\x9c\xabV*)-\xc8IU\xb2R\x88\x8e\xd5QP\xca\xc9,.' \
+                       b'\x81\xb1\xd3r\xf2\x13A\x1cC=\x03 /3\x0f\xcc\xae\x05' \
+                       b'\x00kU\r\xcc'
+        result = SentryMessage.decode_body(message)
+        self.assertEqual({'int': 1, 'float': 1.0, 'list': [], 'tuple': []},
+                         result)
+
+    def test_random(self):
+        message = mock.Mock(SentryMessage)
+        message.body = b'x\x9c\xd3\xb5\x05\x00\x00\x99\x00k'
+        self.assertRaises(exceptions.DamagedSentryMessageBodyError,
+                          SentryMessage.decode_body, message)
