@@ -15,10 +15,7 @@ elasticsearch_logger = logging.getLogger('elasticsearch')
 elasticsearch_logger.setLevel(logging.ERROR)
 
 
-BaseMessage = collections.namedtuple('BaseMessage', ['headers', 'body'])
-
-
-class SentryMessage(BaseMessage):
+class SentryMessage(collections.namedtuple('SentryMessage', ['headers', 'body'])):
     @classmethod
     def create_from_udp(cls, data):
         try:
