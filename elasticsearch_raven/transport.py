@@ -12,11 +12,9 @@ import elasticsearch
 from elasticsearch_raven import exceptions
 from elasticsearch_raven.postfix import postfix_encoded_data
 
-elasticsearch_logger = logging.getLogger('elasticsearch')
-elasticsearch_logger.setLevel(logging.ERROR)
 
-
-class SentryMessage(collections.namedtuple('SentryMessage', ['headers', 'body'])):
+class SentryMessage(collections.namedtuple('SentryMessage',
+                                           ['headers', 'body'])):
     @classmethod
     def create_from_udp(cls, data):
         try:
@@ -55,8 +53,9 @@ class ElasticsearchTransport:
         self._use_ssl = use_ssl
 
     def send(self, message):
-        postfix_encoded_data(message.body)
-        dated_index = message.body['project'].format(datetime.datetime.now())
+        message_body = message.decode_body()
+        postfix_encoded_data(message_body)
+        dated_index = message_body['project'].format(datetime.datetime.now())
         http_auth = '{}:{}'.format(message.headers['sentry_key'],
                                    message.headers['sentry_secret'])
         connection = elasticsearch.Elasticsearch(hosts=[self._host],
@@ -64,8 +63,9 @@ class ElasticsearchTransport:
                                                  use_ssl=self._use_ssl)
         for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
             try:
-                connection.index(body=message.body, index=dated_index,
-                                 doc_type='raven-log')
+                with ErrorLevelLoggingManager('elasticsearch'):
+                    connection.index(body=message_body, index=dated_index,
+                                     doc_type='raven-log')
             except elasticsearch.exceptions.ConnectionError as e:
                 retry(e)
 
@@ -89,3 +89,15 @@ def retry_loop(timeout, delay, back_off=1.0):
         delay *= back_off
 
     raise exceptions[0]
+
+
+class ErrorLevelLoggingManager:
+    def __init__(self, logger_name):
+        self._logger = logging.getLogger(logger_name)
+
+    def __enter__(self):
+        self._level = self._logger.level
+        self._logger.setLevel(logging.ERROR)
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._logger.setLevel(self._level)
