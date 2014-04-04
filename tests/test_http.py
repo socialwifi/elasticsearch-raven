@@ -85,7 +85,7 @@ class GetApplicationTest(TestCase):
         utils._pending_logs = mock.Mock()
         aplication = utils.get_application()
         result = aplication(self.environ, self.start_response)
-        self.assertEqual([''], result)
+        self.assertEqual([b''], result)
 
 
 
