@@ -13,7 +13,8 @@ from elasticsearch_raven import exceptions
 from elasticsearch_raven.postfix import postfix_encoded_data
 
 
-class SentryMessage(collections.namedtuple('SentryMessage', ['headers', 'body'])):
+class SentryMessage(collections.namedtuple('SentryMessage',
+                                           ['headers', 'body'])):
     @classmethod
     def create_from_udp(cls, data):
         try:
