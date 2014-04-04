@@ -1,5 +1,6 @@
 import base64
 import collections
+import contextlib
 import datetime
 import json
 import logging
@@ -63,7 +64,7 @@ class ElasticsearchTransport:
                                                  use_ssl=self._use_ssl)
         for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
             try:
-                with ErrorLevelLoggingManager('elasticsearch'):
+                with logger_level_to_error('elasticsearch'):
                     connection.index(body=message_body, index=dated_index,
                                      doc_type='raven-log')
             except elasticsearch.exceptions.ConnectionError as e:
@@ -91,13 +92,10 @@ def retry_loop(timeout, delay, back_off=1.0):
     raise exceptions[0]
 
 
-class ErrorLevelLoggingManager:
-    def __init__(self, logger_name):
-        self._logger = logging.getLogger(logger_name)
-
-    def __enter__(self):
-        self._level = self._logger.level
-        self._logger.setLevel(logging.ERROR)
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self._logger.setLevel(self._level)
+@contextlib.contextmanager
+def logger_level_to_error(logger_name):
+    logger = logging.getLogger(logger_name)
+    level = logger.level
+    logger.setLevel(logging.ERROR)
+    yield
+    logger.setLevel(level)
