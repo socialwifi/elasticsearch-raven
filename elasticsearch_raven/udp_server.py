@@ -1,10 +1,14 @@
 import argparse
 import datetime
-import queue
 import socket
 import sys
 import time
 import threading
+
+try:
+    import queue
+except ImportError:
+    import Queue as queue
 
 import elasticsearch
 
