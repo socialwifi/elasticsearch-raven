@@ -1,4 +1,5 @@
 import datetime
+import logging
 import string
 from unittest import TestCase
 
@@ -9,6 +10,7 @@ except ImportError:
 
 from elasticsearch_raven import exceptions
 from elasticsearch_raven.transport import ElasticsearchTransport
+from elasticsearch_raven.transport import logger_level_to_error
 from elasticsearch_raven.transport import SentryMessage
 
 
@@ -123,3 +125,12 @@ class ElasticsearchTransportSendTest(TestCase):
                     'project': 'index-{0:%Y.%m.%d}', 'extra': {
                     'foo<string>': 'bar'}})],
             ElasticSearch.mock_calls)
+
+
+class LoggerLevelToErrorTest(TestCase):
+    def test_level(self):
+        logger = logging.getLogger('test')
+        logger.setLevel(logging.WARNING)
+        with logger_level_to_error('test'):
+            self.assertEqual(logging.ERROR, logger.level)
+        self.assertEqual(logging.WARNING, logger.level)
