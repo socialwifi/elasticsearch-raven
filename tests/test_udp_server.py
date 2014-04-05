@@ -100,7 +100,6 @@ class _RunServerTest(TestCase):
         self.exception_queue.get.side_effect = KeyboardInterrupt
         udp_server._run_server(self.sock, self.pending_logs,
                                self.exception_queue, self.transport)
-        print(self.exception_queue.mock_calls)
         self.assertEqual([mock.call.close()], self.sock.mock_calls)
 
 
