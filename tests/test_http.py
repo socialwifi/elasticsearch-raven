@@ -86,8 +86,3 @@ class GetApplicationTest(TestCase):
         aplication = utils.get_application()
         result = aplication(self.environ, self.start_response)
         self.assertEqual([b''], result)
-
-
-
-
-
