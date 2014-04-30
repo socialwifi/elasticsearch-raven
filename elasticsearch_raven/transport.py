@@ -3,14 +3,17 @@ import collections
 import contextlib
 import datetime
 import hashlib
+import itertools
 import json
 import logging
 import re
+import sys
 import time
 import zlib
 
 import elasticsearch
 
+from elasticsearch_raven import configuration
 from elasticsearch_raven import exceptions
 from elasticsearch_raven.postfix import postfix_encoded_data
 
@@ -81,6 +84,24 @@ class LogTransport:
             except elasticsearch.exceptions.ConnectionError as e:
                 retry(e)
 
+    def search(self, http_auth=None, segment_size=1000, **kwargs):
+        connection = elasticsearch.Elasticsearch(
+            hosts=[self._host], http_auth=http_auth, use_ssl=self._use_ssl)
+        for offset in itertools.count(step=segment_size):
+            response = connection.search(doc_type=self.DOCUMENT_TYPE,
+                                         size=segment_size, from_=offset,
+                                         **kwargs)
+            hits = response['hits']['hits']
+            for hit in hits:
+                yield hit
+            if len(hits) < segment_size:
+                break
+
+    def delete(self, index, record_id, http_auth=None):
+        connection = elasticsearch.Elasticsearch(
+            hosts=[self._host], http_auth=http_auth, use_ssl=self._use_ssl)
+        connection.delete(index, self.DOCUMENT_TYPE, record_id)
+
 
 def hash_dict(dictionary):
     message_json = json.dumps(
@@ -119,3 +140,18 @@ def logger_level_to_error(logger_name):
     logger.setLevel(logging.ERROR)
     yield
     logger.setLevel(level)
+
+
+def update_ids():
+    transport = LogTransport(configuration['host'], configuration['use_ssl'])
+    all_count, modified_count = 0,0
+    for log in transport.search():
+        all_count += 1
+        log_id = hash_dict(log['_source'])
+        if log['_id'] != log_id:
+            modified_count += 1
+            transport.send(log['_source'], log['_index'], log_id,
+                           configuration['error_http_auth'])
+            transport.delete(log['_index'], log['_id'])
+    sys.stdout.write('Logs: {}\nModified: {}\n'.format(all_count,
+                                                       modified_count))
