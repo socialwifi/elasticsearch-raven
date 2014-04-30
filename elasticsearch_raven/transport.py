@@ -50,6 +50,8 @@ class SentryMessage(collections.namedtuple('SentryMessage',
 
 
 class LogTransport:
+    DOCUMENT_TYPE = 'raven-log'
+
     def __init__(self, host, use_ssl=False):
         self._host = host
         self._use_ssl = use_ssl
@@ -73,8 +75,9 @@ class LogTransport:
         for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
             try:
                 with logger_level_to_error('elasticsearch'):
-                    connection.index(body=body, index=index, id=message_id,
-                                     doc_type='raven-log')
+                    connection.index(body=body, index=index,
+                                     id=message_id,
+                                     doc_type=self.DOCUMENT_TYPE)
             except elasticsearch.exceptions.ConnectionError as e:
                 retry(e)
 
