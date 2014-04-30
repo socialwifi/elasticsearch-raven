@@ -135,8 +135,6 @@ class ElasticsearchTransportSendTest(TestCase):
                          ElasticsearchTransport._get_id(arg2))
 
 
-
-
 class LoggerLevelToErrorTest(TestCase):
     def test_level(self):
         logger = logging.getLogger('test')
