@@ -2,6 +2,7 @@ import base64
 import collections
 import contextlib
 import datetime
+import hashlib
 import json
 import logging
 import re
@@ -56,16 +57,32 @@ class ElasticsearchTransport:
     def send(self, message):
         message_body = message.decode_body()
         postfix_encoded_data(message_body)
-        dated_index = message_body['project'].format(datetime.datetime.now())
-        http_auth = '{}:{}'.format(message.headers['sentry_key'],
-                                   message.headers['sentry_secret'])
-        connection = elasticsearch.Elasticsearch(hosts=[self._host],
-                                                 http_auth=http_auth,
-                                                 use_ssl=self._use_ssl)
+        message_id = self._get_id(message_body)
+        http_auth = self._get_http_auth(message)
+        index = message_body['project'].format(datetime.datetime.now())
+        self._send(message_body, index, http_auth, message_id)
+
+    @staticmethod
+    def _get_id(message_body):
+        message_json = json.dumps(
+            message_body, indent=None, ensure_ascii=True, separators=None,
+            sort_keys=True)
+        sha1 = hashlib.sha1()
+        sha1.update(message_json.encode('ascii'))
+        return sha1.hexdigest()
+
+    @staticmethod
+    def _get_http_auth(message):
+        return '{}:{}'.format(message.headers['sentry_key'],
+                              message.headers['sentry_secret'])
+
+    def _send(self, body, index, http_auth, message_id):
+        connection = elasticsearch.Elasticsearch(
+            hosts=[self._host], http_auth=http_auth, use_ssl=self._use_ssl)
         for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
             try:
                 with logger_level_to_error('elasticsearch'):
-                    connection.index(body=message_body, index=dated_index,
+                    connection.index(body=body, index=index, id=message_id,
                                      doc_type='raven-log')
             except elasticsearch.exceptions.ConnectionError as e:
                 retry(e)
