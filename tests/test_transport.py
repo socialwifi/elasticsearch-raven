@@ -14,6 +14,11 @@ from elasticsearch_raven.transport import logger_level_to_error
 from elasticsearch_raven.transport import SentryMessage
 
 
+class DummyMock(mock.Mock):
+    def __eq__(self, other):
+        return True
+
+
 class ParseSentryHeadersTest(TestCase):
     def test_empty_string(self):
         arg = ''
@@ -124,13 +129,8 @@ class ElasticsearchTransportSendTest(TestCase):
                 index='index-2014.01.01', doc_type='raven-log', body={
                     'project': 'index-{0:%Y.%m.%d}', 'extra': {
                     'foo<string>': 'bar'}},
-                id='a453b51cddaaed66942291468b0cbad96f17ef72')],
+                id=DummyMock())],
             ElasticSearch.mock_calls)
-
-    def test_get_id(self):
-        arg = {'a': '1', 'b': 2, 'c': None, 'd': [], 'e': {}}
-        self.assertEqual('a07adfbed45a1475e48e216e3a38e529b2e4ddcd',
-                         ElasticsearchTransport._get_id(arg))
 
     def test_get_id_sort(self):
         arg1 = {'a': '1', 'b': 2, 'c': None, 'd': [], 'e': {}}
