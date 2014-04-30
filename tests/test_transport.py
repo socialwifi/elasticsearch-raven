@@ -114,7 +114,7 @@ class LogTransportSendTest(TestCase):
         message = transport.SentryMessage(headers, body)
         message.decode_body = mock.Mock()
         message.decode_body.return_value = body
-        log_transport.send(message)
+        log_transport.send_message(message)
         self.assertEqual([mock.call(
             http_auth='key123:secret456', use_ssl=False,
             hosts=['example.com']),
@@ -128,13 +128,13 @@ class LogTransportSendTest(TestCase):
     def test_get_id(self):
         arg = {'a': '1', 'b': 2, 'c': None, 'd': [], 'e': {}}
         self.assertEqual('a07adfbed45a1475e48e216e3a38e529b2e4ddcd',
-                         transport.LogTransport._get_id(arg))
+                         transport.hash_dict(arg))
 
     def test_get_id_sort(self):
         arg1 = {'a': '1', 'b': 2, 'c': None, 'd': [], 'e': {}}
         arg2 = {'e': {}, 'd': [], 'c': None, 'b': 2, 'a': '1'}
-        self.assertEqual(transport.LogTransport._get_id(arg1),
-                         transport.LogTransport._get_id(arg2))
+        self.assertEqual(transport.hash_dict(arg1),
+                         transport.hash_dict(arg2))
 
 
 
