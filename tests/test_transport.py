@@ -1,12 +1,8 @@
 import datetime
 import logging
+import mock
 import string
 from unittest import TestCase
-
-try:
-    from unitetest import mock
-except ImportError:
-    import mock
 
 from elasticsearch_raven import exceptions
 from elasticsearch_raven.transport import ElasticsearchTransport
