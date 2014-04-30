@@ -49,7 +49,7 @@ class SentryMessage(collections.namedtuple('SentryMessage',
             raise exceptions.DamagedSentryMessageBodyError
 
 
-class ElasticsearchTransport:
+class LogTransport:
     def __init__(self, host, use_ssl=False):
         self._host = host
         self._use_ssl = use_ssl

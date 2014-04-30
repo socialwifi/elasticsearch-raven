@@ -5,7 +5,7 @@ import string
 from unittest import TestCase
 
 from elasticsearch_raven import exceptions
-from elasticsearch_raven.transport import ElasticsearchTransport
+from elasticsearch_raven.transport import LogTransport 
 from elasticsearch_raven.transport import logger_level_to_error
 from elasticsearch_raven.transport import SentryMessage
 
@@ -106,18 +106,18 @@ class CreateFromHttpTest(TestCase):
         self.assertEqual(b'body', message.body)
 
 
-class ElasticsearchTransportSendTest(TestCase):
+class LogTransportSendTest(TestCase):
     @mock.patch('elasticsearch_raven.transport.datetime')
     @mock.patch('elasticsearch.Elasticsearch')
     def test_example(self, ElasticSearch, datetime_mock):
-        transport = ElasticsearchTransport('example.com', False)
+        log_transport = LogTransport('example.com', False)
         datetime_mock.datetime.now.return_value = datetime.datetime(2014, 1, 1)
         headers = {'sentry_key': 'key123', 'sentry_secret': 'secret456'}
         body = {'project': 'index-{0:%Y.%m.%d}', 'extra': {'foo': 'bar'}}
         message = SentryMessage(headers, body)
         message.decode_body = mock.Mock()
         message.decode_body.return_value = body
-        transport.send(message)
+        log_transport.send(message)
         self.assertEqual([mock.call(
             http_auth='key123:secret456', use_ssl=False,
             hosts=['example.com']),
@@ -128,11 +128,16 @@ class ElasticsearchTransportSendTest(TestCase):
                 id=DummyMock())],
             ElasticSearch.mock_calls)
 
+    def test_get_id(self):
+        arg = {'a': '1', 'b': 2, 'c': None, 'd': [], 'e': {}}
+        self.assertEqual('a07adfbed45a1475e48e216e3a38e529b2e4ddcd',
+                         LogTransport._get_id(arg))
+
     def test_get_id_sort(self):
         arg1 = {'a': '1', 'b': 2, 'c': None, 'd': [], 'e': {}}
         arg2 = {'e': {}, 'd': [], 'c': None, 'b': 2, 'a': '1'}
-        self.assertEqual(ElasticsearchTransport._get_id(arg1),
-                         ElasticsearchTransport._get_id(arg2))
+        self.assertEqual(LogTransport._get_id(arg1),
+                         LogTransport._get_id(arg2))
 
 
 class LoggerLevelToErrorTest(TestCase):
