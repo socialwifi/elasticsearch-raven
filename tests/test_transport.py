@@ -128,11 +128,6 @@ class ElasticsearchTransportSendTest(TestCase):
                 id=DummyMock())],
             ElasticSearch.mock_calls)
 
-    def test_get_id(self):
-        arg = {'a': '1', 'b': 2, 'c': None, 'd': [], 'e': {}}
-        self.assertEqual('a07adfbed45a1475e48e216e3a38e529b2e4ddcd',
-                         ElasticsearchTransport._get_id(arg))
-
     def test_get_id_sort(self):
         arg1 = {'a': '1', 'b': 2, 'c': None, 'd': [], 'e': {}}
         arg2 = {'e': {}, 'd': [], 'c': None, 'b': 2, 'a': '1'}
