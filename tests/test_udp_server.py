@@ -17,7 +17,7 @@ from elasticsearch_raven import udp_server
 
 
 class RunServerTest(TestCase):
-    @mock.patch('elasticsearch_raven.udp_server.ElasticsearchTransport')
+    @mock.patch('elasticsearch_raven.udp_server.LogTransport')
     @mock.patch('elasticsearch_raven.udp_server.queue')
     @mock.patch('argparse._sys')
     @mock.patch('elasticsearch_raven.udp_server._run_server')
