@@ -107,7 +107,7 @@ def _send_message(transport, pending_logs):
     try:
         for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
             try:
-                transport.send(message)
+                transport.send_message(message)
             except elasticsearch.exceptions.ConnectionError as e:
                 retry(e)
     except elasticsearch.exceptions.TransportError as e:

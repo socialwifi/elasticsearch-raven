@@ -54,29 +54,20 @@ class LogTransport:
         self._host = host
         self._use_ssl = use_ssl
 
-    def send(self, message):
+    def send_message(self, message):
         message_body = message.decode_body()
         postfix_encoded_data(message_body)
-        message_id = self._get_id(message_body)
+        message_id = hash_dict(message_body)
         http_auth = self._get_http_auth(message)
         index = message_body['project'].format(datetime.datetime.now())
-        self._send(message_body, index, http_auth, message_id)
-
-    @staticmethod
-    def _get_id(message_body):
-        message_json = json.dumps(
-            message_body, indent=None, ensure_ascii=True,
-            separators=(',', ':'), sort_keys=True)
-        sha1 = hashlib.sha1()
-        sha1.update(message_json.encode('ascii'))
-        return sha1.hexdigest()
+        self.send(message_body, index, message_id, http_auth)
 
     @staticmethod
     def _get_http_auth(message):
         return '{}:{}'.format(message.headers['sentry_key'],
                               message.headers['sentry_secret'])
 
-    def _send(self, body, index, http_auth, message_id):
+    def send(self, body, index, message_id, http_auth=None):
         connection = elasticsearch.Elasticsearch(
             hosts=[self._host], http_auth=http_auth, use_ssl=self._use_ssl)
         for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
@@ -86,6 +77,15 @@ class LogTransport:
                                      doc_type='raven-log')
             except elasticsearch.exceptions.ConnectionError as e:
                 retry(e)
+
+
+def hash_dict(dictionary):
+    message_json = json.dumps(
+        dictionary, indent=None, ensure_ascii=True, separators=(', ', ': '),
+        sort_keys=True)
+    sha1 = hashlib.sha1()
+    sha1.update(message_json.encode('ascii'))
+    return sha1.hexdigest()
 
 
 def retry_loop(timeout, delay, back_off=1.0):
