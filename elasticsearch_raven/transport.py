@@ -65,8 +65,8 @@ class ElasticsearchTransport:
     @staticmethod
     def _get_id(message_body):
         message_json = json.dumps(
-            message_body, indent=None, ensure_ascii=True, separators=None,
-            sort_keys=True)
+            message_body, indent=None, ensure_ascii=True,
+            separators=(',', ':'), sort_keys=True)
         sha1 = hashlib.sha1()
         sha1.update(message_json.encode('ascii'))
         return sha1.hexdigest()
