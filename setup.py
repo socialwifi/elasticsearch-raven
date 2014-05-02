@@ -7,7 +7,7 @@ setup(
     author_email='tomasz@pozytywnie.pl',
     url='https://github.com/pozytywnie/elasticsearch-raven/',
     packages=['elasticsearch_raven'],
-    scripts=['bin/elasticsearch-raven.py'],
+    scripts=['bin/elasticsearch-raven.py', 'bin/update_ids.py'],
     license='MIT',
     description='Proxy that allows to send logs from Raven to Elasticsearch.',
     long_description=open('README.md').read(),

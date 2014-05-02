@@ -13,7 +13,7 @@ except ImportError:
 import elasticsearch
 
 from elasticsearch_raven import configuration
-from elasticsearch_raven.transport import ElasticsearchTransport
+from elasticsearch_raven.transport import LogTransport
 from elasticsearch_raven.transport import SentryMessage
 
 
@@ -25,8 +25,8 @@ def run_server():
         sys.stdout.write('Wrong hostname.\n')
         sys.exit(1)
     else:
-        transport = ElasticsearchTransport(configuration['host'],
-                                           configuration['use_ssl'])
+        transport = LogTransport(configuration['host'],
+                                              configuration['use_ssl'])
         pending_logs = queue.Queue(configuration['queue_maxsize'])
         exception_queue = queue.Queue()
         _run_server(sock, pending_logs, exception_queue, transport, args.debug)
@@ -107,7 +107,7 @@ def _send_message(transport, pending_logs):
     try:
         for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
             try:
-                transport.send(message)
+                transport.send_message(message)
             except elasticsearch.exceptions.ConnectionError as e:
                 retry(e)
     except elasticsearch.exceptions.TransportError as e:

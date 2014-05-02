@@ -4,7 +4,7 @@ except ImportError:
     import Queue as queue
 
 from elasticsearch_raven import configuration
-from elasticsearch_raven.transport import ElasticsearchTransport
+from elasticsearch_raven.transport import LogTransport
 from elasticsearch_raven.transport import SentryMessage
 from elasticsearch_raven.udp_server import get_sender
 
@@ -15,7 +15,7 @@ class HttpUtils:
         self._exception_queue = queue.Queue()
 
     def start_sender(self):
-        transport = ElasticsearchTransport(configuration['host'],
+        transport = LogTransport(configuration['host'],
                                            configuration['use_ssl'])
         sender = get_sender(transport, self._pending_logs, self._exception_queue)
         sender.start()

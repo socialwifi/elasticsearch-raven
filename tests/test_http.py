@@ -9,24 +9,24 @@ from elasticsearch_raven.http import HttpUtils
 
 
 class StartSenderTest(TestCase):
-    @mock.patch('elasticsearch_raven.http.ElasticsearchTransport')
+    @mock.patch('elasticsearch_raven.http.LogTransport')
     @mock.patch('elasticsearch_raven.http.get_sender')
-    def test_thread_start(self, get_sender, ElasticsearchTransport):
+    def test_thread_start(self, get_sender, LogTransport):
         utils = HttpUtils()
         utils.start_sender()
-        self.assertEqual([mock.call(ElasticsearchTransport(),
+        self.assertEqual([mock.call(LogTransport(),
                                     utils._pending_logs,
                                     utils._exception_queue),
                           mock.call().start()], get_sender.mock_calls)
 
     @mock.patch.dict('elasticsearch_raven.http.configuration', {
         'host': 'test_host', 'use_ssl': True})
-    @mock.patch('elasticsearch_raven.http.ElasticsearchTransport')
+    @mock.patch('elasticsearch_raven.http.LogTransport')
     @mock.patch('elasticsearch_raven.http.get_sender')
-    def test_configuration(self, get_sender, ElasticsearchTransport):
+    def test_configuration(self, get_sender, LogTransport):
         utils = HttpUtils()
         utils.start_sender()
-        self.assertEqual([mock.call('test_host', True)], ElasticsearchTransport.mock_calls)
+        self.assertEqual([mock.call('test_host', True)], LogTransport.mock_calls)
 
 
 class GetApplicationTest(TestCase):

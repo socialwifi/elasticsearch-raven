@@ -17,7 +17,7 @@ from elasticsearch_raven import udp_server
 
 
 class RunServerTest(TestCase):
-    @mock.patch('elasticsearch_raven.udp_server.ElasticsearchTransport')
+    @mock.patch('elasticsearch_raven.udp_server.LogTransport')
     @mock.patch('elasticsearch_raven.udp_server.queue')
     @mock.patch('argparse._sys')
     @mock.patch('elasticsearch_raven.udp_server._run_server')
@@ -168,7 +168,7 @@ class GetSenderTest(TestCase):
     def test_exception(self):
         self.pending_logs.get.return_value = mock.Mock()
         exception = Exception('test')
-        self.transport.send.side_effect = exception
+        self.transport.send_message.side_effect = exception
         self.run_sender_function()
         self.assertEqual([mock.call.put(exception)],
                          self.exception_queue.mock_calls)
@@ -178,7 +178,7 @@ class GetSenderTest(TestCase):
         self.pending_logs.get.return_value = mock.Mock()
         self.pending_logs.task_done.side_effect = Exception('test')
         exception = elasticsearch.exceptions.ConnectionError('test')
-        self.transport.send.side_effect = exception
+        self.transport.send_message.side_effect = exception
         retry = mock.Mock()
         retry_loop.return_value = [retry, retry, retry]
         self.run_sender_function()
@@ -210,7 +210,7 @@ class GetSenderTest(TestCase):
     @mock.patch('elasticsearch_raven.udp_server.elasticsearch.Elasticsearch')
     def test_log_transport_error(self, Elasticsearch):
         exception = elasticsearch.exceptions.TransportError(404, 'test')
-        self.transport.send.side_effect = [exception, Exception]
+        self.transport.send_message.side_effect = [exception, Exception]
         headers = {'test_header': 'foo'},
         body = {'int': 1}
         self.pending_logs.get.return_value = SentryMessage(headers, body)
