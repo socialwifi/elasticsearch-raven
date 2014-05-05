@@ -17,7 +17,7 @@ from elasticsearch_raven import udp_server
 
 
 class RunServerTest(TestCase):
-    @mock.patch('elasticsearch_raven.udp_server.LogTransport')
+    @mock.patch('elasticsearch_raven.udp_server.transport.LogTransport')
     @mock.patch('elasticsearch_raven.udp_server.queue')
     @mock.patch('argparse._sys')
     @mock.patch('elasticsearch_raven.udp_server._run_server')
@@ -113,7 +113,7 @@ class GetHandlerTest(TestCase):
                                           self.exception]
 
     @mock.patch('elasticsearch_raven.udp_server.datetime')
-    @mock.patch('elasticsearch_raven.udp_server.SentryMessage')
+    @mock.patch('elasticsearch_raven.udp_server.transport.SentryMessage')
     @mock.patch('sys.stdout')
     def test_debug(self, stdout, SentryMessage, datetime_mock):
         datetime_mock.datetime.now.return_value = datetime.datetime(2014, 1, 1)
@@ -131,14 +131,14 @@ class GetHandlerTest(TestCase):
         else:
             thread._Thread__target()
 
-    @mock.patch('elasticsearch_raven.udp_server.SentryMessage')
+    @mock.patch('elasticsearch_raven.udp_server.transport.SentryMessage')
     def test_exception(self, SentryMessage):
         self.run_handler_function()
 
         self.assertEqual([mock.call.put(self.exception)],
                          self.exception_queue.mock_calls)
 
-    @mock.patch('elasticsearch_raven.udp_server.SentryMessage')
+    @mock.patch('elasticsearch_raven.udp_server.transport.SentryMessage')
     def test_put_result_and_join_on_queue(self, SentryMessage):
         self.run_handler_function()
         self.assertEqual([mock.call.put(SentryMessage.create_from_udp()),
@@ -150,7 +150,7 @@ class GetHandlerTest(TestCase):
         self.assertIsInstance(result, threading.Thread)
         self.assertEqual(True, result.daemon)
 
-    @mock.patch('elasticsearch_raven.udp_server.SentryMessage')
+    @mock.patch('elasticsearch_raven.udp_server.transport.SentryMessage')
     def test_close_socket(self, SentryMessage):
         self.sock.recvfrom.side_effect = Exception
         self.run_handler_function()
