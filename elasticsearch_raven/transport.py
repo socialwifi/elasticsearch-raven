@@ -73,8 +73,7 @@ class LogTransport:
                               message.headers['sentry_secret'])
 
     def send(self, body, index, message_id, http_auth=None):
-        connection = elasticsearch.Elasticsearch(
-            hosts=[self._host], http_auth=http_auth, use_ssl=self._use_ssl)
+        connection = self._connect(http_auth)
         for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
             try:
                 with logger_level_to_error('elasticsearch'):
@@ -84,9 +83,13 @@ class LogTransport:
             except elasticsearch.exceptions.ConnectionError as e:
                 retry(e)
 
+    def _connect(self, http_auth):
+        return elasticsearch.Elasticsearch(hosts=[self._host],
+                                           http_auth=http_auth,
+                                           use_ssl=self._use_ssl)
+
     def search(self, http_auth=None, segment_size=1000, **kwargs):
-        connection = elasticsearch.Elasticsearch(
-            hosts=[self._host], http_auth=http_auth, use_ssl=self._use_ssl)
+        connection = self._connect(http_auth)
         for offset in itertools.count(step=segment_size):
             response = connection.search(doc_type=self.DOCUMENT_TYPE,
                                          size=segment_size, from_=offset,
@@ -98,8 +101,7 @@ class LogTransport:
                 break
 
     def delete(self, index, record_id, http_auth=None):
-        connection = elasticsearch.Elasticsearch(
-            hosts=[self._host], http_auth=http_auth, use_ssl=self._use_ssl)
+        connection = self._connect(http_auth)
         connection.delete(index, self.DOCUMENT_TYPE, record_id)
 
 
