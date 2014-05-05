@@ -9,7 +9,7 @@ from elasticsearch_raven.http import HttpUtils
 
 
 class StartSenderTest(TestCase):
-    @mock.patch('elasticsearch_raven.http.LogTransport')
+    @mock.patch('elasticsearch_raven.http.transport.LogTransport')
     @mock.patch('elasticsearch_raven.http.get_sender')
     def test_thread_start(self, get_sender, LogTransport):
         utils = HttpUtils()
@@ -21,12 +21,13 @@ class StartSenderTest(TestCase):
 
     @mock.patch.dict('elasticsearch_raven.http.configuration', {
         'host': 'test_host', 'use_ssl': True})
-    @mock.patch('elasticsearch_raven.http.LogTransport')
+    @mock.patch('elasticsearch_raven.http.transport.LogTransport')
     @mock.patch('elasticsearch_raven.http.get_sender')
     def test_configuration(self, get_sender, LogTransport):
         utils = HttpUtils()
         utils.start_sender()
-        self.assertEqual([mock.call('test_host', True)], LogTransport.mock_calls)
+        self.assertEqual([mock.call('test_host', http_auth=None,
+                                    use_ssl=True)], LogTransport.mock_calls)
 
 
 class GetApplicationTest(TestCase):
@@ -42,7 +43,7 @@ class GetApplicationTest(TestCase):
         utils._exception_queue.put(Exception('test'))
         self.assertRaises(Exception, aplication, None, None)
 
-    @mock.patch('elasticsearch_raven.http.SentryMessage')
+    @mock.patch('elasticsearch_raven.http.transport.SentryMessage')
     def test_read_content_length(self, SentryMessage):
         self.environ['CONTENT_LENGTH'] = '1234'
         utils = HttpUtils()
@@ -51,7 +52,7 @@ class GetApplicationTest(TestCase):
         self.assertEqual([mock.call.read(1234)],
                          self.environ['wsgi.input'].mock_calls)
 
-    @mock.patch('elasticsearch_raven.http.SentryMessage')
+    @mock.patch('elasticsearch_raven.http.transport.SentryMessage')
     def test_create_from_http(self, SentryMessage):
         utils = HttpUtils()
         aplication = utils.get_application()
@@ -60,7 +61,7 @@ class GetApplicationTest(TestCase):
             self.environ['HTTP_X_SENTRY_AUTH'],
             self.environ['wsgi.input'].read())], SentryMessage.mock_calls)
 
-    @mock.patch('elasticsearch_raven.http.SentryMessage')
+    @mock.patch('elasticsearch_raven.http.transport.SentryMessage')
     def test_put_on_pedding_logs(self, SentryMessage):
         utils = HttpUtils()
         utils._pending_logs = mock.Mock()
@@ -69,7 +70,7 @@ class GetApplicationTest(TestCase):
         self.assertEqual([mock.call.put(SentryMessage.create_from_http())],
                          utils._pending_logs.mock_calls)
 
-    @mock.patch('elasticsearch_raven.http.SentryMessage')
+    @mock.patch('elasticsearch_raven.http.transport.SentryMessage')
     def test_response(self, SentryMessage):
         utils = HttpUtils()
         utils._pending_logs = mock.Mock()
@@ -79,7 +80,7 @@ class GetApplicationTest(TestCase):
                                     [('Content-Type', 'text/plain')])],
                          self.start_response.mock_calls)
 
-    @mock.patch('elasticsearch_raven.http.SentryMessage')
+    @mock.patch('elasticsearch_raven.http.transport.SentryMessage')
     def test_return(self, SentryMessage):
         utils = HttpUtils()
         utils._pending_logs = mock.Mock()

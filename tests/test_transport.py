@@ -107,16 +107,17 @@ class LogTransportSendTest(TestCase):
     @mock.patch('elasticsearch_raven.transport.datetime')
     @mock.patch('elasticsearch.Elasticsearch')
     def test_example(self, ElasticSearch, datetime_mock):
-        log_transport = transport.LogTransport('example.com', False)
+        log_transport = transport.LogTransport('example.com', use_ssl=False,
+                                               http_auth='login:password')
         datetime_mock.datetime.now.return_value = datetime.datetime(2014, 1, 1)
-        headers = {'sentry_key': 'key123', 'sentry_secret': 'secret456'}
+        headers = {}
         body = {'project': 'index-{0:%Y.%m.%d}', 'extra': {'foo': 'bar'}}
         message = transport.SentryMessage(headers, body)
         message.decode_body = mock.Mock()
         message.decode_body.return_value = body
         log_transport.send_message(message)
         self.assertEqual([mock.call(
-            http_auth='key123:secret456', use_ssl=False,
+            http_auth='login:password', use_ssl=False,
             hosts=['example.com']),
             mock.call().__getattr__('index')(
                 index='index-2014.01.01', doc_type='raven-log', body={

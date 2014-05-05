@@ -145,15 +145,16 @@ def logger_level_to_error(logger_name):
 
 
 def update_ids():
-    transport = LogTransport(configuration['host'], configuration['use_ssl'])
-    all_count, modified_count = 0,0
-    for log in transport.search():
+    log_transport = LogTransport(configuration['host'],
+                                 configuration['use_ssl'])
+    all_count, modified_count = 0, 0
+    for log in log_transport.search():
         all_count += 1
         log_id = hash_dict(log['_source'])
         if log['_id'] != log_id:
             modified_count += 1
-            transport.send(log['_source'], log['_index'], log_id,
-                           configuration['error_http_auth'])
-            transport.delete(log['_index'], log['_id'])
+            log_transport.send(log['_source'], log['_index'], log_id,
+                               configuration['error_http_auth'])
+            log_transport.delete(log['_index'], log['_id'])
     sys.stdout.write('Logs: {}\nModified: {}\n'.format(all_count,
                                                        modified_count))
