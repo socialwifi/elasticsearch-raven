@@ -24,8 +24,7 @@ def run_server():
         sys.stdout.write('Wrong hostname.\n')
         sys.exit(1)
     else:
-        log_transport = transport.LogTransport(configuration['host'],
-                                               configuration['use_ssl'])
+        log_transport = transport.get_configured_log_transport()
         pending_logs = queue.Queue(configuration['queue_maxsize'])
         exception_queue = queue.Queue()
         _run_server(sock, pending_logs, exception_queue, log_transport,
@@ -115,7 +114,7 @@ def _send_message(log_transport, pending_logs):
         connection = elasticsearch.Elasticsearch(
             hosts=[configuration['host']],
             use_ssl=configuration['use_ssl'],
-            http_auth=configuration['error_http_auth'])
+            http_auth=configuration['http_auth'])
         body = {'message': str(message), 'error': str(e)}
         connection.index(index='elasticsearch-raven-error', body=body,
                          doc_type='elasticsearch-raven-log')

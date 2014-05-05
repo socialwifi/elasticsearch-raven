@@ -14,8 +14,7 @@ class HttpUtils:
         self._exception_queue = queue.Queue()
 
     def start_sender(self):
-        log_transport = transport.LogTransport(configuration['host'],
-                                               configuration['use_ssl'])
+        log_transport = transport.get_configured_log_transport()
         sender = get_sender(log_transport, self._pending_logs,
                             self._exception_queue)
         sender.start()
