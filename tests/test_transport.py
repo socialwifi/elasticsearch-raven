@@ -1,15 +1,16 @@
 import datetime
 import logging
+import mock
 import string
 from unittest import TestCase
 
-try:
-    from unitetest import mock
-except ImportError:
-    import mock
-
 from elasticsearch_raven import exceptions
 from elasticsearch_raven import transport
+
+
+class DummyMock(mock.Mock):
+    def __eq__(self, other):
+        return True
 
 
 class ParseSentryHeadersTest(TestCase):
@@ -123,7 +124,7 @@ class LogTransportSendTest(TestCase):
                 index='index-2014.01.01', doc_type='raven-log', body={
                     'project': 'index-{0:%Y.%m.%d}', 'extra': {
                     'foo<string>': 'bar'}},
-                id='a453b51cddaaed66942291468b0cbad96f17ef72')],
+                id=DummyMock())],
             ElasticSearch.mock_calls)
 
     def test_get_id(self):
@@ -136,8 +137,6 @@ class LogTransportSendTest(TestCase):
         arg2 = {'e': {}, 'd': [], 'c': None, 'b': 2, 'a': '1'}
         self.assertEqual(transport.hash_dict(arg1),
                          transport.hash_dict(arg2))
-
-
 
 
 class LoggerLevelToErrorTest(TestCase):

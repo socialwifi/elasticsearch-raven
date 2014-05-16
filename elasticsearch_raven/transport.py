@@ -100,7 +100,7 @@ class LogTransport:
 
 def hash_dict(dictionary):
     message_json = json.dumps(
-        dictionary, indent=None, ensure_ascii=True, separators=None,
+        dictionary, indent=None, ensure_ascii=True, separators=(', ', ': '),
         sort_keys=True)
     sha1 = hashlib.sha1()
     sha1.update(message_json.encode('ascii'))

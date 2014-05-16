@@ -218,12 +218,13 @@ class GetSenderTest(TestCase):
         self.assertEqual(
             [mock.call(use_ssl=False, http_auth=None,
                        hosts=['localhost:9200']),
-             mock.call().__getattr__('index')(body={
-                 'error': "TransportError(404, 'test')",
-                 'message': "SentryMessage(headers=({'test_header': 'foo'},), "
-                            "body={'int': 1})"},
-                               doc_type='elasticsearch-raven-log',
-                               index='elasticsearch-raven-error')],
+             mock.call().__getattr__('index')(
+                 body={
+                     'error': "TransportError(404, 'test')",
+                     'message': "SentryMessage(headers=({'test_header': 'foo'}"
+                     ",), body={'int': 1})"},
+             doc_type='elasticsearch-raven-log',
+             index='elasticsearch-raven-error')],
             Elasticsearch.mock_calls)
 
 

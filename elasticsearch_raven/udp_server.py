@@ -111,14 +111,18 @@ def _send_message(log_transport, pending_logs):
             except elasticsearch.exceptions.ConnectionError as e:
                 retry(e)
     except elasticsearch.exceptions.TransportError as e:
-        connection = elasticsearch.Elasticsearch(
-            hosts=[configuration['host']],
-            use_ssl=configuration['use_ssl'],
-            http_auth=configuration['http_auth'])
-        body = {'message': str(message), 'error': str(e)}
-        connection.index(index='elasticsearch-raven-error', body=body,
-                         doc_type='elasticsearch-raven-log')
+        _raport_error(message, e)
     pending_logs.task_done()
+
+
+def _raport_error(message, error):
+    connection = elasticsearch.Elasticsearch(
+        hosts=[configuration['host']],
+        use_ssl=configuration['use_ssl'],
+        http_auth=configuration['http_auth'])
+    body = {'message': str(message), 'error': str(error)}
+    connection.index(index='elasticsearch-raven-error', body=body,
+                     doc_type='elasticsearch-raven-log')
 
 
 def retry_loop(timeout, delay, back_off=1.0):
