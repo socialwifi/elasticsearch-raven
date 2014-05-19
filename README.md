@@ -19,9 +19,9 @@ Example installation for pip:
 Configure Ravan to your proxy location
 
     RAVEN_CONFIG = {
-        'dsn': 'protocol://user:password@host:port/index',
+        'dsn': 'protocol://public:secret@host:port/index',
     }
-user:password will be used for authentication for your elasticsearch, but even if you don't use basic http authentication Raven requires setting them, for valid Sentry dsn.
+public:secret is required by Raven, for valid Sentry dsn pattern, but it doesn't affect log sending.
 
 Indexes are formatted with actual date.
 Suggested format:
@@ -37,6 +37,10 @@ Define elasticsearch location by setting environment variable ELASTICSEARCH_HOST
 If you use your elasticsearch with https protocol, you should set environment variable USE_SSL to True
 
     export USE_SSL=True
+
+To use http authentication just set ELASTICSEARCH_AUTH variable using 'login:password' format
+
+    export ELASTICSEARCH_AUTH=login:password
 
 ##Usage
 ###Option 1: wsgi

@@ -13,8 +13,7 @@ except ImportError:
 import elasticsearch
 
 from elasticsearch_raven import configuration
-from elasticsearch_raven.transport import LogTransport
-from elasticsearch_raven.transport import SentryMessage
+from elasticsearch_raven import transport
 
 
 def run_server():
@@ -25,11 +24,11 @@ def run_server():
         sys.stdout.write('Wrong hostname.\n')
         sys.exit(1)
     else:
-        transport = LogTransport(configuration['host'],
-                                              configuration['use_ssl'])
+        log_transport = transport.get_configured_log_transport()
         pending_logs = queue.Queue(configuration['queue_maxsize'])
         exception_queue = queue.Queue()
-        _run_server(sock, pending_logs, exception_queue, transport, args.debug)
+        _run_server(sock, pending_logs, exception_queue, log_transport,
+                    args.debug)
 
 
 def _parse_args():
@@ -48,9 +47,10 @@ def get_socket(ip, port):
     return sock
 
 
-def _run_server(sock, pending_logs, exception_queue, transport, debug=False):
+def _run_server(sock, pending_logs, exception_queue, log_transport,
+                debug=False):
     handler = get_handler(sock, pending_logs, exception_queue, debug=debug)
-    sender = get_sender(transport, pending_logs, exception_queue)
+    sender = get_sender(log_transport, pending_logs, exception_queue)
     handler.start()
     sender.start()
     try:
@@ -72,7 +72,7 @@ def get_handler(sock, pending_logs, exception_queue, debug=False):
         try:
             while True:
                 data, address = sock.recvfrom(65535)
-                message = SentryMessage.create_from_udp(data)
+                message = transport.SentryMessage.create_from_udp(data)
                 pending_logs.put(message)
                 if debug:
                     sys.stdout.write('{host}:{port} [{date}]\n'.format(
@@ -88,12 +88,12 @@ def get_handler(sock, pending_logs, exception_queue, debug=False):
     return handler
 
 
-def get_sender(transport, pending_logs, exception_queue):
+def get_sender(log_transport, pending_logs, exception_queue):
 
     def _send():
         try:
             while True:
-                _send_message(transport, pending_logs)
+                _send_message(log_transport, pending_logs)
         except Exception as e:
             exception_queue.put(e)
 
@@ -102,12 +102,12 @@ def get_sender(transport, pending_logs, exception_queue):
     return sender
 
 
-def _send_message(transport, pending_logs):
+def _send_message(log_transport, pending_logs):
     message = pending_logs.get()
     try:
         for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
             try:
-                transport.send_message(message)
+                log_transport.send_message(message)
             except elasticsearch.exceptions.ConnectionError as e:
                 retry(e)
     except elasticsearch.exceptions.TransportError as e:
@@ -119,7 +119,7 @@ def _raport_error(message, error):
     connection = elasticsearch.Elasticsearch(
         hosts=[configuration['host']],
         use_ssl=configuration['use_ssl'],
-        http_auth=configuration['error_http_auth'])
+        http_auth=configuration['http_auth'])
     body = {'message': str(message), 'error': str(error)}
     connection.index(index='elasticsearch-raven-error', body=body,
                      doc_type='elasticsearch-raven-log')
