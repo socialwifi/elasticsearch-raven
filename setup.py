@@ -10,7 +10,7 @@ setup(
     scripts=['bin/elasticsearch-raven.py', 'bin/update_ids.py'],
     license='MIT',
     description='Proxy that allows to send logs from Raven to Elasticsearch.',
-    long_description=open('README.md').read(),
+    long_description=open('README.rst').read(),
     install_requires=['elasticsearch'],
     test_suite='tests',
 )
