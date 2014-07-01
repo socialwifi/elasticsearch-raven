@@ -14,6 +14,7 @@ import elasticsearch
 
 from elasticsearch_raven import configuration
 from elasticsearch_raven import transport
+from elasticsearch_raven import queues
 
 
 def run_server():
@@ -25,7 +26,7 @@ def run_server():
         sys.exit(1)
     else:
         log_transport = transport.get_configured_log_transport()
-        pending_logs = queue.Queue(configuration['queue_maxsize'])
+        pending_logs = queues.ThreadingQueue(configuration['queue_maxsize'])
         exception_queue = queue.Queue()
         _run_server(sock, pending_logs, exception_queue, log_transport,
                     args.debug)
@@ -58,7 +59,7 @@ def _run_server(sock, pending_logs, exception_queue, log_transport,
     except KeyboardInterrupt:
         sock.close()
         try:
-            while pending_logs.unfinished_tasks:
+            while pending_logs.has_nonpersistent_task():
                 try:
                     raise exception_queue.get(timeout=1)
                 except queue.Empty:

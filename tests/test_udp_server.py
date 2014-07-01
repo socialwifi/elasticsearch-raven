@@ -18,12 +18,15 @@ from elasticsearch_raven import udp_server
 
 class RunServerTest(TestCase):
     @mock.patch('elasticsearch_raven.udp_server.transport.LogTransport')
+    @mock.patch('elasticsearch_raven.udp_server.queues')
     @mock.patch('elasticsearch_raven.udp_server.queue')
     @mock.patch('argparse._sys')
     @mock.patch('elasticsearch_raven.udp_server._run_server')
     @mock.patch('elasticsearch_raven.udp_server.get_socket')
-    def test_args(self, get_socket, _run_server, sys, queue, Transport):
-        queue.Queue.side_effect = ['pending_logs', 'exception_queue']
+    def test_args(self, get_socket, _run_server, sys, python_queue, queues,
+                  Transport):
+        python_queue.Queue.return_value = 'exception_queue'
+        queues.ThreadingQueue.return_value = 'pending_logs'
         Transport.return_value = 'transport'
         get_socket.return_value = 'test_socket'
         sys.argv = ['test', '192.168.1.1', '8888', '--debug']
