@@ -26,7 +26,12 @@ def run_server():
         sys.exit(1)
     else:
         log_transport = transport.get_configured_log_transport()
-        pending_logs = queues.ThreadingQueue(configuration['queue_maxsize'])
+        if args.amqp_queue:
+            pending_logs = queues.KombuQueue(configuration['amqp_url'],
+                                             configuration['amqp_queue'])
+        else:
+            pending_logs = queues.ThreadingQueue(
+                configuration['queue_maxsize'])
         Server(sock, pending_logs, log_transport,
                args.debug).run()
 
@@ -38,6 +43,9 @@ def _parse_args():
     parser.add_argument('--debug', dest='debug', action='store_const',
                         const=True, default=False,
                         help='Print debug logs to stdout')
+    parser.add_argument(
+        '--amqp-queue', action='store_const', const=True, default=False,
+        help='Use amqp queue to store logs to send to elasticsearch.')
     return parser.parse_args()
 
 
