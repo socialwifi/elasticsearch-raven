@@ -76,19 +76,21 @@ class _RunServerTest(TestCase):
         self.exception_queue = mock.Mock()
         self.transport = mock.Mock()
 
-    @mock.patch('elasticsearch_raven.udp_server.get_handler')
+    @mock.patch('elasticsearch_raven.udp_server.Handler')
     @mock.patch('elasticsearch_raven.udp_server.Sender')
-    def test_handler_start(self, Sender, get_handler):
+    def test_handler_start(self, Sender, Handler):
         self.exception_queue.get.side_effect = KeyboardInterrupt
         udp_server._run_server(self.sock, self.pending_logs,
                                self.exception_queue, self.transport)
-        self.assertEqual([mock.call(
-            self.sock, self.pending_logs, self.exception_queue, debug=False),
-            mock.call().start()], get_handler.mock_calls)
+        self.assertEqual([
+            mock.call(self.sock, self.pending_logs, self.exception_queue,
+                      debug=False),
+            mock.call().as_thread(),
+            mock.call().as_thread().start()], Handler.mock_calls)
 
-    @mock.patch('elasticsearch_raven.udp_server.get_handler')
+    @mock.patch('elasticsearch_raven.udp_server.Handler')
     @mock.patch('elasticsearch_raven.udp_server.Sender')
-    def test_sender_start(self, Sender, get_handler):
+    def test_sender_start(self, Sender, Handler):
         self.exception_queue.get.side_effect = KeyboardInterrupt
         udp_server._run_server(self.sock, self.pending_logs,
                                self.exception_queue, self.transport)
@@ -98,9 +100,9 @@ class _RunServerTest(TestCase):
                           mock.call().as_thread(),
                           mock.call().as_thread().start()], Sender.mock_calls)
 
-    @mock.patch('elasticsearch_raven.udp_server.get_handler')
+    @mock.patch('elasticsearch_raven.udp_server.Handler')
     @mock.patch('elasticsearch_raven.udp_server.Sender')
-    def test_close_socket(self, Sender, get_handler):
+    def test_close_socket(self, Sender, Handler):
         self.exception_queue.get.side_effect = KeyboardInterrupt
         udp_server._run_server(self.sock, self.pending_logs,
                                self.exception_queue, self.transport)
@@ -128,8 +130,8 @@ class GetHandlerTest(TestCase):
             stdout.mock_calls)
 
     def run_handler_function(self, **kwargs):
-        thread = udp_server.get_handler(self.sock, self.pending_logs,
-                                        self.exception_queue, **kwargs)
+        thread = udp_server.Handler(self.sock, self.pending_logs,
+                                    self.exception_queue, **kwargs).as_thread()
         if hasattr(thread, '_target'):
             thread._target()
         else:
@@ -149,8 +151,8 @@ class GetHandlerTest(TestCase):
                           mock.call.join()], self.pending_logs.mock_calls)
 
     def test_daemon_thread(self):
-        result = udp_server.get_handler(self.sock, self.pending_logs,
-                                        self.exception_queue)
+        result = udp_server.Handler(self.sock, self.pending_logs,
+                                    self.exception_queue).as_thread()
         self.assertIsInstance(result, threading.Thread)
         self.assertEqual(True, result.daemon)
 

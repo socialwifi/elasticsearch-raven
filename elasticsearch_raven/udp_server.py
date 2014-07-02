@@ -50,7 +50,8 @@ def get_socket(ip, port):
 
 def _run_server(sock, pending_logs, exception_queue, log_transport,
                 debug=False):
-    handler = get_handler(sock, pending_logs, exception_queue, debug=debug)
+    handler = Handler(sock, pending_logs, exception_queue,
+                      debug=debug).as_thread()
     sender = Sender(log_transport, pending_logs, exception_queue).as_thread()
     handler.start()
     sender.start()
@@ -68,25 +69,32 @@ def _run_server(sock, pending_logs, exception_queue, log_transport,
             pass
 
 
-def get_handler(sock, pending_logs, exception_queue, debug=False):
-    def _handle():
+class Handler(object):
+    def __init__(self, sock, pending_logs, exception_queue, debug=False):
+        self.sock = sock
+        self.pending_logs = pending_logs
+        self.exception_queue = exception_queue
+        self.debug = debug
+
+    def as_thread(self):
+        handler = threading.Thread(target=self._handle)
+        handler.daemon = True
+        return handler
+
+    def _handle(self):
         try:
             while True:
-                data, address = sock.recvfrom(65535)
+                data, address = self.sock.recvfrom(65535)
                 message = transport.SentryMessage.create_from_udp(data)
-                pending_logs.put(message)
-                if debug:
+                self.pending_logs.put(message)
+                if self.debug:
                     sys.stdout.write('{host}:{port} [{date}]\n'.format(
                         host=address[0], port=address[1],
                         date=datetime.datetime.now()))
         except Exception as e:
-            sock.close()
-            pending_logs.join()
-            exception_queue.put(e)
-
-    handler = threading.Thread(target=_handle)
-    handler.daemon = True
-    return handler
+            self.sock.close()
+            self.pending_logs.join()
+            self.exception_queue.put(e)
 
 
 class Sender(object):
