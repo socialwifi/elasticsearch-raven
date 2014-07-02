@@ -28,8 +28,8 @@ def run_server():
         log_transport = transport.get_configured_log_transport()
         pending_logs = queues.ThreadingQueue(configuration['queue_maxsize'])
         exception_queue = queue.Queue()
-        _run_server(sock, pending_logs, exception_queue, log_transport,
-                    args.debug)
+        Server(sock, pending_logs, exception_queue, log_transport,
+               args.debug).run()
 
 
 def _parse_args():
@@ -48,25 +48,34 @@ def get_socket(ip, port):
     return sock
 
 
-def _run_server(sock, pending_logs, exception_queue, log_transport,
-                debug=False):
-    handler = Handler(sock, pending_logs, exception_queue,
-                      debug=debug).as_thread()
-    sender = Sender(log_transport, pending_logs, exception_queue).as_thread()
-    handler.start()
-    sender.start()
-    try:
-        raise exception_queue.get()
-    except KeyboardInterrupt:
-        sock.close()
+class Server(object):
+    def __init__(self, sock, pending_logs, exception_queue, log_transport,
+                 debug=False):
+        self.sock = sock
+        self.pending_logs = pending_logs
+        self.exception_queue = exception_queue
+        self.log_transport = log_transport
+        self.debug = debug
+
+    def run(self):
+        handler = Handler(self.sock, self.pending_logs, self.exception_queue,
+                          debug=self.debug).as_thread()
+        sender = Sender(self.log_transport, self.pending_logs,
+                        self.exception_queue).as_thread()
+        handler.start()
+        sender.start()
         try:
-            while pending_logs.has_nonpersistent_task():
-                try:
-                    raise exception_queue.get(timeout=1)
-                except queue.Empty:
-                    pass
+            raise self.exception_queue.get()
         except KeyboardInterrupt:
-            pass
+            self.sock.close()
+            try:
+                while self.pending_logs.has_nonpersistent_task():
+                    try:
+                        raise self.exception_queue.get(timeout=1)
+                    except queue.Empty:
+                        pass
+            except KeyboardInterrupt:
+                pass
 
 
 class Handler(object):
