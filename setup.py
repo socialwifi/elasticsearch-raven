@@ -2,7 +2,7 @@ from setuptools import setup
 
 setup(
     name='Elasticsearch-Raven',
-    version='1.1',
+    version='1.2',
     author='Tomasz Wysocki',
     author_email='tomasz@pozytywnie.pl',
     url='https://github.com/pozytywnie/elasticsearch-raven/',
@@ -11,6 +11,6 @@ setup(
     license='MIT',
     description='Proxy that allows to send logs from Raven to Elasticsearch.',
     long_description=open('README.rst').read(),
-    install_requires=['elasticsearch'],
+    install_requires=['elasticsearch', 'kombu'],
     test_suite='tests',
 )
