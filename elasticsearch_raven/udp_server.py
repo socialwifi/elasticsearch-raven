@@ -51,7 +51,7 @@ def get_socket(ip, port):
 def _run_server(sock, pending_logs, exception_queue, log_transport,
                 debug=False):
     handler = get_handler(sock, pending_logs, exception_queue, debug=debug)
-    sender = get_sender(log_transport, pending_logs, exception_queue)
+    sender = Sender(log_transport, pending_logs, exception_queue).as_thread()
     handler.start()
     sender.start()
     try:
@@ -89,41 +89,44 @@ def get_handler(sock, pending_logs, exception_queue, debug=False):
     return handler
 
 
-def get_sender(log_transport, pending_logs, exception_queue):
+class Sender(object):
+    def __init__(self, log_transport, pending_logs, exception_queue):
+        self.log_transport = log_transport
+        self.pending_logs = pending_logs
+        self.exception_queue = exception_queue
 
-    def _send():
+    def as_thread(self):
+        sender = threading.Thread(target=self._send)
+        sender.daemon = True
+        return sender
+
+    def _send(self):
         try:
             while True:
-                _send_message(log_transport, pending_logs)
+                self._send_message()
         except Exception as e:
-            exception_queue.put(e)
+            self.exception_queue.put(e)
 
-    sender = threading.Thread(target=_send)
-    sender.daemon = True
-    return sender
+    def _send_message(self):
+        message = self.pending_logs.get()
+        try:
+            for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
+                try:
+                    self.log_transport.send_message(message)
+                except elasticsearch.exceptions.ConnectionError as e:
+                    retry(e)
+        except elasticsearch.exceptions.TransportError as e:
+            self._raport_error(message, e)
+        self.pending_logs.task_done()
 
-
-def _send_message(log_transport, pending_logs):
-    message = pending_logs.get()
-    try:
-        for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
-            try:
-                log_transport.send_message(message)
-            except elasticsearch.exceptions.ConnectionError as e:
-                retry(e)
-    except elasticsearch.exceptions.TransportError as e:
-        _raport_error(message, e)
-    pending_logs.task_done()
-
-
-def _raport_error(message, error):
-    connection = elasticsearch.Elasticsearch(
-        hosts=[configuration['host']],
-        use_ssl=configuration['use_ssl'],
-        http_auth=configuration['http_auth'])
-    body = {'message': str(message), 'error': str(error)}
-    connection.index(index='elasticsearch-raven-error', body=body,
-                     doc_type='elasticsearch-raven-log')
+    def _raport_error(self, message, error):
+        connection = elasticsearch.Elasticsearch(
+            hosts=[configuration['host']],
+            use_ssl=configuration['use_ssl'],
+            http_auth=configuration['http_auth'])
+        body = {'message': str(message), 'error': str(error)}
+        connection.index(index='elasticsearch-raven-error', body=body,
+                         doc_type='elasticsearch-raven-log')
 
 
 def retry_loop(timeout, delay, back_off=1.0):

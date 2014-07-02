@@ -5,7 +5,7 @@ except ImportError:
 
 from elasticsearch_raven import configuration
 from elasticsearch_raven import transport
-from elasticsearch_raven.udp_server import get_sender
+from elasticsearch_raven.udp_server import Sender
 
 
 class HttpUtils:
@@ -15,8 +15,8 @@ class HttpUtils:
 
     def start_sender(self):
         log_transport = transport.get_configured_log_transport()
-        sender = get_sender(log_transport, self._pending_logs,
-                            self._exception_queue)
+        sender = Sender(log_transport, self._pending_logs,
+                        self._exception_queue).as_thread()
         sender.start()
 
     def get_application(self):

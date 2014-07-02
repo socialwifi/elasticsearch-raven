@@ -77,8 +77,8 @@ class _RunServerTest(TestCase):
         self.transport = mock.Mock()
 
     @mock.patch('elasticsearch_raven.udp_server.get_handler')
-    @mock.patch('elasticsearch_raven.udp_server.get_sender')
-    def test_handler_start(self, get_sender, get_handler):
+    @mock.patch('elasticsearch_raven.udp_server.Sender')
+    def test_handler_start(self, Sender, get_handler):
         self.exception_queue.get.side_effect = KeyboardInterrupt
         udp_server._run_server(self.sock, self.pending_logs,
                                self.exception_queue, self.transport)
@@ -87,19 +87,20 @@ class _RunServerTest(TestCase):
             mock.call().start()], get_handler.mock_calls)
 
     @mock.patch('elasticsearch_raven.udp_server.get_handler')
-    @mock.patch('elasticsearch_raven.udp_server.get_sender')
-    def test_sender_start(self, get_sender, get_handler):
+    @mock.patch('elasticsearch_raven.udp_server.Sender')
+    def test_sender_start(self, Sender, get_handler):
         self.exception_queue.get.side_effect = KeyboardInterrupt
         udp_server._run_server(self.sock, self.pending_logs,
                                self.exception_queue, self.transport)
 
         self.assertEqual([mock.call(self.transport, self.pending_logs,
                                     self.exception_queue),
-                          mock.call().start()], get_sender.mock_calls)
+                          mock.call().as_thread(),
+                          mock.call().as_thread().start()], Sender.mock_calls)
 
     @mock.patch('elasticsearch_raven.udp_server.get_handler')
-    @mock.patch('elasticsearch_raven.udp_server.get_sender')
-    def test_close_socket(self, get_sender, get_handler):
+    @mock.patch('elasticsearch_raven.udp_server.Sender')
+    def test_close_socket(self, Sender, get_handler):
         self.exception_queue.get.side_effect = KeyboardInterrupt
         udp_server._run_server(self.sock, self.pending_logs,
                                self.exception_queue, self.transport)
@@ -190,16 +191,16 @@ class GetSenderTest(TestCase):
                          retry_loop.mock_calls)
 
     def run_sender_function(self):
-        thread = udp_server.get_sender(self.transport, self.pending_logs,
-                                       self.exception_queue)
+        thread = udp_server.Sender(self.transport, self.pending_logs,
+                                   self.exception_queue).as_thread()
         if hasattr(thread, '_target'):
             thread._target()
         else:
             thread._Thread__target()
 
     def test_daemon_thread(self):
-        result = udp_server.get_sender(self.transport, self.pending_logs,
-                                       self.exception_queue)
+        result = udp_server.Sender(self.transport, self.pending_logs,
+                                   self.exception_queue).as_thread()
         self.assertIsInstance(result, threading.Thread)
         self.assertEqual(True, result.daemon)
 
