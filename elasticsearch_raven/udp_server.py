@@ -27,8 +27,7 @@ def run_server():
     else:
         log_transport = transport.get_configured_log_transport()
         pending_logs = queues.ThreadingQueue(configuration['queue_maxsize'])
-        exception_queue = queue.Queue()
-        Server(sock, pending_logs, exception_queue, log_transport,
+        Server(sock, pending_logs, log_transport,
                args.debug).run()
 
 
@@ -49,13 +48,12 @@ def get_socket(ip, port):
 
 
 class Server(object):
-    def __init__(self, sock, pending_logs, exception_queue, log_transport,
-                 debug=False):
+    def __init__(self, sock, pending_logs, log_transport, debug=False):
         self.sock = sock
         self.pending_logs = pending_logs
-        self.exception_queue = exception_queue
         self.log_transport = log_transport
         self.debug = debug
+        self.exception_queue = queue.Queue()
 
     def run(self):
         handler = Handler(self.sock, self.pending_logs, self.exception_queue,

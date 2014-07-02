@@ -25,7 +25,6 @@ class RunServerTest(TestCase):
     @mock.patch('elasticsearch_raven.udp_server.get_socket')
     def test_args(self, get_socket, Server, sys, python_queue, queues,
                   Transport):
-        python_queue.Queue.return_value = 'exception_queue'
         queues.ThreadingQueue.return_value = 'pending_logs'
         Transport.return_value = 'transport'
         get_socket.return_value = 'test_socket'
@@ -34,7 +33,7 @@ class RunServerTest(TestCase):
         self.assertEqual([mock.call('192.168.1.1', 8888)],
                          get_socket.mock_calls)
         self.assertEqual([mock.call('test_socket', 'pending_logs',
-                                    'exception_queue', 'transport', True),
+                                    'transport', True),
                           mock.call().run()],
                          Server.mock_calls)
 
@@ -81,8 +80,9 @@ class _RunServerTest(TestCase):
     @mock.patch('elasticsearch_raven.udp_server.Sender')
     def test_handler_start(self, Sender, Handler):
         self.exception_queue.get.side_effect = KeyboardInterrupt
-        udp_server.Server(self.sock, self.pending_logs,
-                          self.exception_queue, self.transport).run()
+        server = udp_server.Server(self.sock, self.pending_logs, self.transport)
+        server.exception_queue = self.exception_queue
+        server.run()
         self.assertEqual([
             mock.call(self.sock, self.pending_logs, self.exception_queue,
                       debug=False),
@@ -93,9 +93,9 @@ class _RunServerTest(TestCase):
     @mock.patch('elasticsearch_raven.udp_server.Sender')
     def test_sender_start(self, Sender, Handler):
         self.exception_queue.get.side_effect = KeyboardInterrupt
-        udp_server.Server(self.sock, self.pending_logs,
-                          self.exception_queue, self.transport).run()
-
+        server = udp_server.Server(self.sock, self.pending_logs, self.transport)
+        server.exception_queue = self.exception_queue
+        server.run()
         self.assertEqual([mock.call(self.transport, self.pending_logs,
                                     self.exception_queue),
                           mock.call().as_thread(),
@@ -105,8 +105,9 @@ class _RunServerTest(TestCase):
     @mock.patch('elasticsearch_raven.udp_server.Sender')
     def test_close_socket(self, Sender, Handler):
         self.exception_queue.get.side_effect = KeyboardInterrupt
-        udp_server.Server(self.sock, self.pending_logs,
-                          self.exception_queue, self.transport).run()
+        server = udp_server.Server(self.sock, self.pending_logs, self.transport)
+        server.exception_queue = self.exception_queue
+        server.run()
         self.assertEqual([mock.call.close()], self.sock.mock_calls)
 
 
