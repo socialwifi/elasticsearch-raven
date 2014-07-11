@@ -64,10 +64,11 @@ class Server(object):
         self.exception_queue = queue.Queue()
 
     def run(self):
-        handler = Handler(self.sock, self.pending_logs, self.exception_queue,
-                          debug=self.debug).as_thread()
+        handler = Handler(
+            self.sock, self.pending_logs, self.thread_exception_handler,
+            debug=self.debug).as_thread()
         sender = Sender(self.log_transport, self.pending_logs,
-                        self.exception_queue).as_thread()
+                        self.thread_exception_handler).as_thread()
         handler.start()
         sender.start()
         try:
@@ -83,12 +84,15 @@ class Server(object):
             except KeyboardInterrupt:
                 pass
 
+    def thread_exception_handler(self, exception):
+        self.exception_queue.put(exception)
+
 
 class Handler(object):
-    def __init__(self, sock, pending_logs, exception_queue, debug=False):
+    def __init__(self, sock, pending_logs, exception_handler, debug=False):
         self.sock = sock
         self.pending_logs = pending_logs
-        self.exception_queue = exception_queue
+        self.exception_handler = exception_handler
         self.debug = debug
 
     def as_thread(self):
@@ -109,14 +113,14 @@ class Handler(object):
         except Exception as e:
             self.sock.close()
             self.pending_logs.join()
-            self.exception_queue.put(e)
+            self.exception_handler(e)
 
 
 class Sender(object):
-    def __init__(self, log_transport, pending_logs, exception_queue):
+    def __init__(self, log_transport, pending_logs, exception_handler):
         self.log_transport = log_transport
         self.pending_logs = pending_logs
-        self.exception_queue = exception_queue
+        self.exception_handler = exception_handler
 
     def as_thread(self):
         sender = threading.Thread(target=self._send)
@@ -128,7 +132,7 @@ class Sender(object):
             while True:
                 self._send_message()
         except Exception as e:
-            self.exception_queue.put(e)
+            self.exception_handler(e)
 
     def _send_message(self):
         message = self.pending_logs.get()
