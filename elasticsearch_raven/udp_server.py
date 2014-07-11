@@ -1,5 +1,4 @@
 import argparse
-import datetime
 import socket
 import sys
 import time
@@ -15,6 +14,7 @@ import elasticsearch
 from elasticsearch_raven import configuration
 from elasticsearch_raven import transport
 from elasticsearch_raven import queues
+from elasticsearch_raven import udp_handler
 
 
 def run_server():
@@ -64,7 +64,7 @@ class Server(object):
         self.exception_queue = queue.Queue()
 
     def run(self):
-        handler = Handler(
+        handler = udp_handler.Handler(
             self.sock, self.pending_logs, self.thread_exception_handler,
             debug=self.debug).as_thread()
         sender = Sender(self.log_transport, self.pending_logs,
@@ -86,34 +86,6 @@ class Server(object):
 
     def thread_exception_handler(self, exception):
         self.exception_queue.put(exception)
-
-
-class Handler(object):
-    def __init__(self, sock, pending_logs, exception_handler, debug=False):
-        self.sock = sock
-        self.pending_logs = pending_logs
-        self.exception_handler = exception_handler
-        self.debug = debug
-
-    def as_thread(self):
-        handler = threading.Thread(target=self._handle)
-        handler.daemon = True
-        return handler
-
-    def _handle(self):
-        try:
-            while True:
-                data, address = self.sock.recvfrom(65535)
-                message = transport.SentryMessage.create_from_udp(data)
-                self.pending_logs.put(message)
-                if self.debug:
-                    sys.stdout.write('{host}:{port} [{date}]\n'.format(
-                        host=address[0], port=address[1],
-                        date=datetime.datetime.now()))
-        except Exception as e:
-            self.sock.close()
-            self.pending_logs.join()
-            self.exception_handler(e)
 
 
 class Sender(object):
