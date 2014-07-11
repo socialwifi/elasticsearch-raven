@@ -13,11 +13,11 @@ class Sender(object):
         self.exception_handler = exception_handler
 
     def as_thread(self):
-        sender = threading.Thread(target=self._send)
+        sender = threading.Thread(target=self.send)
         sender.daemon = True
         return sender
 
-    def _send(self):
+    def send(self):
         try:
             while True:
                 self._send_message()
