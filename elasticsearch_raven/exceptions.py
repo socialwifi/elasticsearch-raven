@@ -1,4 +1,3 @@
-
 class ElasticsearchRavenError(Exception):
     pass
 
