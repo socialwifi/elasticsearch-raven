@@ -57,7 +57,7 @@ def _split_list_by_type(data):
         for value_type, value in postfix_types(('', element)):
             result[value_type].append(value)
     if result:
-        return result
+        return dict(result)
     else:
         return {'': []}
 
