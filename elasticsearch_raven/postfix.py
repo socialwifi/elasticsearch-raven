@@ -7,8 +7,8 @@ def postfix_encoded_data(encoded_data):
     sentry_fields = keys_starting_with(encoded_data, 'sentry.')
     field_names_to_postfix.extend(sentry_fields)
 
-    fields_to_postfix = filter(lambda x: x in field_names_to_postfix,
-                               encoded_data)
+    fields_to_postfix = (field for field in encoded_data
+                         if field in field_names_to_postfix)
 
     for field in fields_to_postfix:
         _, encoded_data[field] = next(postfix_types(
@@ -16,7 +16,7 @@ def postfix_encoded_data(encoded_data):
 
 
 def keys_starting_with(dictionary, word):
-    return (key for key in dictionary.keys() if key.startswith(word))
+    return (key for key in dictionary if key.startswith(word))
 
 
 def postfix_types(row):
