@@ -16,7 +16,7 @@ class StartSenderTest(TestCase):
         utils.start_sender()
         self.assertEqual([mock.call(LogTransport(),
                                     utils._pending_logs,
-                                    utils._exception_queue),
+                                    utils._exception_queue.put),
                           mock.call().as_thread(),
                           mock.call().as_thread().start()], Sender.mock_calls)
 
