@@ -12,7 +12,9 @@ except ImportError:
 
 import elasticsearch
 
+from elasticsearch_raven import queue_sender
 from elasticsearch_raven.transport import SentryMessage
+from elasticsearch_raven import udp_handler
 from elasticsearch_raven import udp_server
 
 
@@ -76,33 +78,33 @@ class _RunServerTest(TestCase):
         self.exception_queue = mock.Mock()
         self.transport = mock.Mock()
 
-    @mock.patch('elasticsearch_raven.udp_server.Handler')
-    @mock.patch('elasticsearch_raven.udp_server.Sender')
+    @mock.patch('elasticsearch_raven.udp_handler.Handler')
+    @mock.patch('elasticsearch_raven.queue_sender.Sender')
     def test_handler_start(self, Sender, Handler):
         self.exception_queue.get.side_effect = KeyboardInterrupt
         server = udp_server.Server(self.sock, self.pending_logs, self.transport)
         server.exception_queue = self.exception_queue
         server.run()
         self.assertEqual([
-            mock.call(self.sock, self.pending_logs, self.exception_queue,
-                      debug=False),
+            mock.call(self.sock, self.pending_logs,
+                      server.thread_exception_handler, debug=False),
             mock.call().as_thread(),
             mock.call().as_thread().start()], Handler.mock_calls)
 
-    @mock.patch('elasticsearch_raven.udp_server.Handler')
-    @mock.patch('elasticsearch_raven.udp_server.Sender')
+    @mock.patch('elasticsearch_raven.udp_handler.Handler')
+    @mock.patch('elasticsearch_raven.queue_sender.Sender')
     def test_sender_start(self, Sender, Handler):
         self.exception_queue.get.side_effect = KeyboardInterrupt
         server = udp_server.Server(self.sock, self.pending_logs, self.transport)
         server.exception_queue = self.exception_queue
         server.run()
         self.assertEqual([mock.call(self.transport, self.pending_logs,
-                                    self.exception_queue),
+                                    server.thread_exception_handler),
                           mock.call().as_thread(),
                           mock.call().as_thread().start()], Sender.mock_calls)
 
-    @mock.patch('elasticsearch_raven.udp_server.Handler')
-    @mock.patch('elasticsearch_raven.udp_server.Sender')
+    @mock.patch('elasticsearch_raven.udp_handler.Handler')
+    @mock.patch('elasticsearch_raven.queue_sender.Sender')
     def test_close_socket(self, Sender, Handler):
         self.exception_queue.get.side_effect = KeyboardInterrupt
         server = udp_server.Server(self.sock, self.pending_logs, self.transport)
@@ -120,7 +122,7 @@ class GetHandlerTest(TestCase):
         self.sock.recvfrom.side_effect = [({}, ('192.168.1.1', 8888)),
                                           self.exception]
 
-    @mock.patch('elasticsearch_raven.udp_server.datetime')
+    @mock.patch('elasticsearch_raven.udp_handler.datetime')
     @mock.patch('elasticsearch_raven.udp_server.transport.SentryMessage')
     @mock.patch('sys.stdout')
     def test_debug(self, stdout, SentryMessage, datetime_mock):
@@ -132,8 +134,9 @@ class GetHandlerTest(TestCase):
             stdout.mock_calls)
 
     def run_handler_function(self, **kwargs):
-        thread = udp_server.Handler(self.sock, self.pending_logs,
-                                    self.exception_queue, **kwargs).as_thread()
+        handler = udp_handler.Handler(
+            self.sock, self.pending_logs, self.exception_queue, **kwargs)
+        thread = handler.as_thread()
         if hasattr(thread, '_target'):
             thread._target()
         else:
@@ -153,8 +156,8 @@ class GetHandlerTest(TestCase):
                           mock.call.join()], self.pending_logs.mock_calls)
 
     def test_daemon_thread(self):
-        result = udp_server.Handler(self.sock, self.pending_logs,
-                                    self.exception_queue).as_thread()
+        result = udp_handler.Handler(self.sock, self.pending_logs,
+                                     self.exception_queue).as_thread()
         self.assertIsInstance(result, threading.Thread)
         self.assertEqual(True, result.daemon)
 
@@ -181,7 +184,7 @@ class GetSenderTest(TestCase):
         self.assertEqual([mock.call.put(exception)],
                          self.exception_queue.mock_calls)
 
-    @mock.patch('elasticsearch_raven.udp_server.retry_loop')
+    @mock.patch('elasticsearch_raven.queue_sender.retry_loop')
     def test_retry_connection(self, retry_loop):
         self.pending_logs.get.return_value = mock.Mock()
         self.pending_logs.task_done.side_effect = Exception('test')
@@ -195,16 +198,16 @@ class GetSenderTest(TestCase):
                          retry_loop.mock_calls)
 
     def run_sender_function(self):
-        thread = udp_server.Sender(self.transport, self.pending_logs,
-                                   self.exception_queue).as_thread()
+        thread = queue_sender.Sender(self.transport, self.pending_logs,
+                                     self.exception_queue).as_thread()
         if hasattr(thread, '_target'):
             thread._target()
         else:
             thread._Thread__target()
 
     def test_daemon_thread(self):
-        result = udp_server.Sender(self.transport, self.pending_logs,
-                                   self.exception_queue).as_thread()
+        result = queue_sender.Sender(self.transport, self.pending_logs,
+                                     self.exception_queue).as_thread()
         self.assertIsInstance(result, threading.Thread)
         self.assertEqual(True, result.daemon)
 
@@ -215,7 +218,7 @@ class GetSenderTest(TestCase):
         self.assertEqual([mock.call.get(), mock.call.task_done()],
                          self.pending_logs.mock_calls)
 
-    @mock.patch('elasticsearch_raven.udp_server.elasticsearch.Elasticsearch')
+    @mock.patch('elasticsearch.Elasticsearch')
     def test_log_transport_error(self, Elasticsearch):
         exception = elasticsearch.exceptions.TransportError(404, 'test')
         self.transport.send_message.side_effect = [exception, Exception]
@@ -240,7 +243,7 @@ class RetryLoopTest(TestCase):
     def test_timeout(self):
         start_time = time.time()
         try:
-            for retry in udp_server.retry_loop(0.001, 0):
+            for retry in queue_sender.retry_loop(0.001, 0):
                 try:
                     raise Exception('test')
                 except Exception as e:
@@ -252,7 +255,7 @@ class RetryLoopTest(TestCase):
     @mock.patch('time.sleep')
     def test_delay(self, sleep):
 
-        retry_generator = udp_server.retry_loop(10, 1)
+        retry_generator = queue_sender.retry_loop(10, 1)
         for i in range(4):
                 retry = six.next(retry_generator)
                 retry(Exception('test'))
@@ -262,7 +265,7 @@ class RetryLoopTest(TestCase):
 
     @mock.patch('time.sleep')
     def test_back_off(self, sleep):
-        retry_generator = udp_server.retry_loop(10, 1, back_off=2)
+        retry_generator = queue_sender.retry_loop(10, 1, back_off=2)
         for i in range(4):
             retry = six.next(retry_generator)
             retry(Exception('test'))
@@ -270,7 +273,7 @@ class RetryLoopTest(TestCase):
                          sleep.mock_calls)
 
     def test_raises(self):
-        retry_generator = udp_server.retry_loop(0, 0)
+        retry_generator = queue_sender.retry_loop(0, 0)
         retry = six.next(retry_generator)
         retry(Exception('test'))
         self.assertRaises(Exception, six.next, retry_generator)
