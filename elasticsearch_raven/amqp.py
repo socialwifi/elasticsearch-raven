@@ -25,6 +25,8 @@ def run_handler():
         sock.bind((ip, int(port)))
     else:
         raise ValueError('only fd and udp protocols are supported')
+    sock.setblocking(1)
+    sock.settimeout(None)
     queue = queues.KombuQueue(configuration['amqp_url'],
                               configuration['amqp_queue'])
     handler = udp_handler.Handler(sock, queue, _exception_handler,
