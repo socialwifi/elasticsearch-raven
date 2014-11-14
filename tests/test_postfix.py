@@ -14,7 +14,7 @@ class ElasticsearchTransportTypePostfixTest(TestCase):
         self.assertEqual({'x': 1, 'extra': {}}, encoded_data)
 
     def test_string(self):
-        encoded_data = {'extra': {'x': 'test'}}
+        encoded_data = {'extra': {'x': u'test'}}
         postfix.postfix_encoded_data(encoded_data)
         self.assertEqual({'extra': {'x<string>': 'test'}}, encoded_data)
 
