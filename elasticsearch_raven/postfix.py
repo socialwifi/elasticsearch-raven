@@ -66,4 +66,5 @@ postfixes = {
     dict: postfix_dict,
     str: postfix_str,
     list: postfix_list,
+    type(u''): postfix_str, # to support unicode on python 2.7
 }
