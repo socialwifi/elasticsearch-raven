@@ -103,15 +103,6 @@ class _RunServerTest(TestCase):
                           mock.call().as_thread(),
                           mock.call().as_thread().start()], Sender.mock_calls)
 
-    @mock.patch('elasticsearch_raven.udp_handler.Handler')
-    @mock.patch('elasticsearch_raven.queue_sender.Sender')
-    def test_close_socket(self, Sender, Handler):
-        self.exception_queue.get.side_effect = KeyboardInterrupt
-        server = udp_server.Server(self.sock, self.pending_logs, self.transport)
-        server.exception_queue = self.exception_queue
-        server.run()
-        self.assertEqual([mock.call.close()], self.sock.mock_calls)
-
 
 class GetHandlerTest(TestCase):
     def setUp(self):
@@ -152,8 +143,8 @@ class GetHandlerTest(TestCase):
     @mock.patch('elasticsearch_raven.udp_server.transport.SentryMessage')
     def test_put_result_and_join_on_queue(self, SentryMessage):
         self.run_handler_function()
-        self.assertEqual([mock.call.put(SentryMessage.create_from_udp()),
-                          mock.call.join()], self.pending_logs.mock_calls)
+        self.assertEqual([mock.call.put(SentryMessage.create_from_udp())],
+                         self.pending_logs.mock_calls)
 
     def test_daemon_thread(self):
         result = udp_handler.Handler(self.sock, self.pending_logs,

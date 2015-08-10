@@ -11,6 +11,7 @@ class Handler(object):
         self.pending_logs = pending_logs
         self.exception_handler = exception_handler
         self.debug = debug
+        self.should_finish = False
 
     def as_thread(self):
         handler = threading.Thread(target=self.handle)
@@ -18,16 +19,18 @@ class Handler(object):
         return handler
 
     def handle(self):
+        self.should_finish = False
         try:
-            while True:
-                data, address = self.sock.recvfrom(65535)
-                message = transport.SentryMessage.create_from_udp(data)
-                self.pending_logs.put(message)
-                if self.debug:
-                    sys.stdout.write('{host}:{port} [{date}]\n'.format(
-                        host=address[0], port=address[1],
-                        date=datetime.datetime.now()))
+            try:
+                while not self.should_finish:
+                    data, address = self.sock.recvfrom(65535)
+                    message = transport.SentryMessage.create_from_udp(data)
+                    self.pending_logs.put(message)
+                    if self.debug:
+                        sys.stdout.write('{host}:{port} [{date}]\n'.format(
+                            host=address[0], port=address[1],
+                            date=datetime.datetime.now()))
+            finally:
+                self.sock.close()
         except Exception as e:
-            self.sock.close()
-            self.pending_logs.join()
             self.exception_handler(e)

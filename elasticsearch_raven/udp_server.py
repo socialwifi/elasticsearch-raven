@@ -1,6 +1,7 @@
 import argparse
 import socket
 import sys
+import signal
 
 try:
     import queue
@@ -63,15 +64,21 @@ class Server(object):
     def run(self):
         handler = udp_handler.Handler(
             self.sock, self.pending_logs, self.thread_exception_handler,
-            debug=self.debug).as_thread()
+            debug=self.debug)
         sender = queue_sender.Sender(self.log_transport, self.pending_logs,
-                                     self.thread_exception_handler).as_thread()
-        handler.start()
-        sender.start()
+                                     self.thread_exception_handler)
+        handler.as_thread().start()
+        sender.as_thread().start()
+
+        def terminate(signum, frame):
+            self.exception_queue.put(KeyboardInterrupt())
+
+        signal.signal(signal.SIGTERM, terminate)
+        signal.signal(signal.SIGQUIT, terminate)
         try:
             raise self.exception_queue.get()
         except KeyboardInterrupt:
-            self.sock.close()
+            handler.should_finish = True
             try:
                 while self.pending_logs.has_nonpersistent_task():
                     try:

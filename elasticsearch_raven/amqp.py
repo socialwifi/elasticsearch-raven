@@ -1,4 +1,6 @@
 import socket
+import signal
+
 try:
     from urllib import parse
 except ImportError:
@@ -31,6 +33,11 @@ def run_handler():
                               configuration['amqp_queue'])
     handler = udp_handler.Handler(sock, queue, _exception_handler,
                                   debug=args.debug)
+
+    def terminate(signum, frame):
+        handler.should_finish = True
+    signal.signal(signal.SIGTERM, terminate)
+    signal.signal(signal.SIGQUIT, terminate)
     handler.handle()
 
 
@@ -48,6 +55,11 @@ def run_sender():
     queue = queues.KombuQueue(configuration['amqp_url'],
                               configuration['amqp_queue'])
     sender = queue_sender.Sender(log_transport, queue, _exception_handler)
+
+    def terminate(signum, frame):
+        sender.should_finish = True
+    signal.signal(signal.SIGTERM, terminate)
+    signal.signal(signal.SIGQUIT, terminate)
     sender.send()
 
 
