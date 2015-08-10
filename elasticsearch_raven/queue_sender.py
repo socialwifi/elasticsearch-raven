@@ -11,6 +11,7 @@ class Sender(object):
         self.log_transport = log_transport
         self.pending_logs = pending_logs
         self.exception_handler = exception_handler
+        self.should_finish = False
 
     def as_thread(self):
         sender = threading.Thread(target=self.send)
@@ -18,8 +19,9 @@ class Sender(object):
         return sender
 
     def send(self):
+        self.should_finish = False
         try:
-            while True:
+            while not self.should_finish:
                 self._send_message()
         except Exception as e:
             self.exception_handler(e)
