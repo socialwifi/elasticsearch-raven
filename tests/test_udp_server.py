@@ -103,15 +103,6 @@ class _RunServerTest(TestCase):
                           mock.call().as_thread(),
                           mock.call().as_thread().start()], Sender.mock_calls)
 
-    @mock.patch('elasticsearch_raven.udp_handler.Handler')
-    @mock.patch('elasticsearch_raven.queue_sender.Sender')
-    def test_close_socket(self, Sender, Handler):
-        self.exception_queue.get.side_effect = KeyboardInterrupt
-        server = udp_server.Server(self.sock, self.pending_logs, self.transport)
-        server.exception_queue = self.exception_queue
-        server.run()
-        self.assertEqual([mock.call.close()], self.sock.mock_calls)
-
 
 class GetHandlerTest(TestCase):
     def setUp(self):

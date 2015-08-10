@@ -71,7 +71,7 @@ class Server(object):
         try:
             raise self.exception_queue.get()
         except KeyboardInterrupt:
-            self.sock.close()
+            handler.should_finish = True
             try:
                 while self.pending_logs.has_nonpersistent_task():
                     try:
