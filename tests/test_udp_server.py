@@ -152,8 +152,8 @@ class GetHandlerTest(TestCase):
     @mock.patch('elasticsearch_raven.udp_server.transport.SentryMessage')
     def test_put_result_and_join_on_queue(self, SentryMessage):
         self.run_handler_function()
-        self.assertEqual([mock.call.put(SentryMessage.create_from_udp()),
-                          mock.call.join()], self.pending_logs.mock_calls)
+        self.assertEqual([mock.call.put(SentryMessage.create_from_udp())],
+                         self.pending_logs.mock_calls)
 
     def test_daemon_thread(self):
         result = udp_handler.Handler(self.sock, self.pending_logs,

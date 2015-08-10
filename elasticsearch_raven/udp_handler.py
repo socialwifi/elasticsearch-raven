@@ -29,5 +29,4 @@ class Handler(object):
                         date=datetime.datetime.now()))
         except Exception as e:
             self.sock.close()
-            self.pending_logs.join()
             self.exception_handler(e)
