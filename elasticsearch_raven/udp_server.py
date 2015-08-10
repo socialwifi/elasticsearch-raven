@@ -1,6 +1,7 @@
 import argparse
 import socket
 import sys
+import signal
 
 try:
     import queue
@@ -68,6 +69,12 @@ class Server(object):
                                      self.thread_exception_handler)
         handler.as_thread().start()
         sender.as_thread().start()
+
+        def terminate(signum, frame):
+            self.exception_queue.put(KeyboardInterrupt())
+
+        signal.signal(signal.SIGTERM, terminate)
+        signal.signal(signal.SIGQUIT, terminate)
         try:
             raise self.exception_queue.get()
         except KeyboardInterrupt:
