@@ -63,11 +63,11 @@ class Server(object):
     def run(self):
         handler = udp_handler.Handler(
             self.sock, self.pending_logs, self.thread_exception_handler,
-            debug=self.debug).as_thread()
+            debug=self.debug)
         sender = queue_sender.Sender(self.log_transport, self.pending_logs,
-                                     self.thread_exception_handler).as_thread()
-        handler.start()
-        sender.start()
+                                     self.thread_exception_handler)
+        handler.as_thread().start()
+        sender.as_thread().start()
         try:
             raise self.exception_queue.get()
         except KeyboardInterrupt:
