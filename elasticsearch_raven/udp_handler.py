@@ -1,8 +1,10 @@
 import datetime
 import sys
+import signal
 import threading
 
 from elasticsearch_raven import transport
+from elasticsearch_raven import utils
 
 
 class Handler(object):
@@ -19,13 +21,13 @@ class Handler(object):
         return handler
 
     def handle(self):
-        self.should_finish = False
         try:
             try:
-                while not self.should_finish:
+                while True:
                     data, address = self.sock.recvfrom(65535)
-                    message = transport.SentryMessage.create_from_udp(data)
-                    self.pending_logs.put(message)
+                    with utils.ignore_signals([signal.SIGTERM, signal.SIGQUIT]):
+                        message = transport.SentryMessage.create_from_udp(data)
+                        self.pending_logs.put(message)
                     if self.debug:
                         sys.stdout.write('{host}:{port} [{date}]\n'.format(
                             host=address[0], port=address[1],

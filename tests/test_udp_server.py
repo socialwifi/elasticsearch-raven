@@ -107,6 +107,7 @@ class GetHandlerTest(TestCase):
         self.sock.recvfrom.side_effect = [({}, ('192.168.1.1', 8888)),
                                           self.exception]
 
+    @mock.patch('elasticsearch_raven.utils.signal', mock.Mock())
     @mock.patch('elasticsearch_raven.udp_handler.datetime')
     @mock.patch('elasticsearch_raven.udp_server.transport.SentryMessage')
     @mock.patch('sys.stdout')
@@ -127,6 +128,7 @@ class GetHandlerTest(TestCase):
         else:
             thread._Thread__target()
 
+    @mock.patch('elasticsearch_raven.utils.signal', mock.Mock())
     @mock.patch('elasticsearch_raven.udp_server.transport.SentryMessage')
     def test_exception(self, SentryMessage):
         self.run_handler_function()
@@ -134,6 +136,7 @@ class GetHandlerTest(TestCase):
         self.assertEqual([mock.call.put(self.exception)],
                          self.exception_queue.mock_calls)
 
+    @mock.patch('elasticsearch_raven.utils.signal', mock.Mock())
     @mock.patch('elasticsearch_raven.udp_server.transport.SentryMessage')
     def test_put_result_and_join_on_queue(self, SentryMessage):
         self.run_handler_function()
@@ -161,6 +164,7 @@ class GetSenderTest(TestCase):
         self.exception_queue = mock.Mock()
         self.transport = mock.Mock()
 
+    @mock.patch('elasticsearch_raven.utils.signal', mock.Mock())
     def test_exception(self):
         self.pending_logs.get.return_value = mock.Mock()
         exception = Exception('test')
@@ -169,6 +173,7 @@ class GetSenderTest(TestCase):
         self.assertEqual([mock.call.put(exception)],
                          self.exception_queue.mock_calls)
 
+    @mock.patch('elasticsearch_raven.utils.signal', mock.Mock())
     @mock.patch('elasticsearch_raven.utils.retry_loop')
     def test_retry_connection(self, retry_loop):
         self.pending_logs.get.side_effect = [mock.Mock(), Exception]
@@ -195,6 +200,7 @@ class GetSenderTest(TestCase):
         self.assertIsInstance(result, threading.Thread)
         self.assertEqual(True, result.daemon)
 
+    @mock.patch('elasticsearch_raven.utils.signal', mock.Mock())
     def test_task_done(self):
         self.pending_logs.get.return_value = mock.Mock()
         self.pending_logs.task_done.side_effect = Exception('test')
@@ -202,6 +208,7 @@ class GetSenderTest(TestCase):
         self.assertEqual([mock.call.get(), mock.call.task_done()],
                          self.pending_logs.mock_calls)
 
+    @mock.patch('elasticsearch_raven.utils.signal', mock.Mock())
     @mock.patch('elasticsearch.Elasticsearch')
     def test_log_transport_error(self, Elasticsearch):
         exception = elasticsearch.exceptions.TransportError(404, 'test')

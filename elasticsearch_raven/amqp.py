@@ -35,7 +35,7 @@ def run_handler():
                                   debug=args.debug)
 
     def terminate(signum, frame):
-        handler.should_finish = True
+        exit(0)
     signal.signal(signal.SIGTERM, terminate)
     signal.signal(signal.SIGQUIT, terminate)
     handler.handle()
@@ -57,7 +57,7 @@ def run_sender():
     sender = queue_sender.Sender(log_transport, queue, _exception_handler)
 
     def terminate(signum, frame):
-        sender.should_finish = True
+        exit(0)
     signal.signal(signal.SIGTERM, terminate)
     signal.signal(signal.SIGQUIT, terminate)
     sender.send()

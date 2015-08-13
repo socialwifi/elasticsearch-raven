@@ -1,4 +1,6 @@
+import contextlib
 import time
+import signal
 
 
 def retry_loop(timeout, delay, back_off=1.0):
@@ -17,3 +19,10 @@ def retry_loop(timeout, delay, back_off=1.0):
         yield retry
 
     raise exceptions.pop()
+
+
+@contextlib.contextmanager
+def ignore_signals(signals):
+    signal.pthread_sigmask(signal.SIG_BLOCK, signals)
+    yield
+    signal.pthread_sigmask(signal.SIG_UNBLOCK, signals)

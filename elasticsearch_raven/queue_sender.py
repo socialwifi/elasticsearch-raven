@@ -1,3 +1,4 @@
+import signal
 import threading
 
 import elasticsearch
@@ -11,7 +12,6 @@ class Sender(object):
         self.log_transport = log_transport
         self.pending_logs = pending_logs
         self.exception_handler = exception_handler
-        self.should_finish = False
 
     def as_thread(self):
         sender = threading.Thread(target=self.send)
@@ -19,26 +19,25 @@ class Sender(object):
         return sender
 
     def send(self):
-        self.should_finish = False
         try:
-            while not self.should_finish:
+            while True:
                 message = self.pending_logs.get()
                 self._send_message(message)
         except Exception as e:
             self.exception_handler(e)
 
     def _send_message(self, message):
-        try:
-            for retry in utils.retry_loop(15 * 60, delay=1, back_off=1.5):
+        for retry in utils.retry_loop(15 * 60, delay=1, back_off=1.5):
+            with utils.ignore_signals([signal.SIGTERM, signal.SIGQUIT]):
                 try:
                     self.log_transport.send_message(message)
                 except elasticsearch.exceptions.ConnectionError as e:
                     retry(e)
+                except elasticsearch.exceptions.TransportError as e:
+                    self._raport_error(message, e)
+                    self.pending_logs.task_done()
                 else:
                     self.pending_logs.task_done()
-        except elasticsearch.exceptions.TransportError as e:
-            self._raport_error(message, e)
-            self.pending_logs.task_done()
 
     def _raport_error(self, message, error):
         connection = elasticsearch.Elasticsearch(
