@@ -1,9 +1,5 @@
 from unittest import TestCase
-
-try:
-    from unitetest import mock
-except ImportError:
-    import mock
+from unittest import mock
 
 from elasticsearch_raven.http import HttpUtils
 

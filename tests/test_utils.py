@@ -1,11 +1,6 @@
-from unittest import TestCase
 import time
-import six
-
-try:
-    from unitetest import mock
-except ImportError:
-    import mock
+from unittest import TestCase
+from unittest import mock
 
 from elasticsearch_raven import utils
 
@@ -28,7 +23,7 @@ class RetryLoopTest(TestCase):
 
         retry_generator = utils.retry_loop(10, 1)
         for i in range(4):
-            retry = six.next(retry_generator)
+            retry = next(retry_generator)
             retry(Exception('test'))
         self.assertEqual([mock.call(1), mock.call(1), mock.call(1)],
                          sleep.mock_calls)
@@ -38,13 +33,13 @@ class RetryLoopTest(TestCase):
     def test_back_off(self, sleep):
         retry_generator = utils.retry_loop(10, 1, back_off=2)
         for i in range(4):
-            retry = six.next(retry_generator)
+            retry = next(retry_generator)
             retry(Exception('test'))
         self.assertEqual([mock.call(1), mock.call(2), mock.call(4)],
                          sleep.mock_calls)
 
     def test_raises(self):
         retry_generator = utils.retry_loop(0, 0)
-        retry = six.next(retry_generator)
+        retry = next(retry_generator)
         retry(Exception('test'))
-        self.assertRaises(Exception, six.next, retry_generator)
+        self.assertRaises(Exception, next, retry_generator)

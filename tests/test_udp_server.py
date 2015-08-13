@@ -2,11 +2,7 @@ import datetime
 import socket
 import threading
 from unittest import TestCase
-
-try:
-    from unitetest import mock
-except ImportError:
-    import mock
+from unittest import mock
 
 import elasticsearch
 
