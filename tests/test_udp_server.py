@@ -178,12 +178,12 @@ class GetSenderTest(TestCase):
     def test_retry_connection(self, retry_loop):
         self.pending_logs.get.side_effect = [mock.Mock(), Exception]
         exception = elasticsearch.exceptions.ConnectionError('test')
-        self.transport.send_message.side_effect = exception
+        self.transport.send_message.side_effect = [exception]*3 + [None]
         retry = mock.Mock()
-        retry_loop.return_value = [retry, retry, retry]
+        retry_loop.return_value = [retry, retry, retry, retry]
         self.run_sender_function()
         self.assertEqual([mock.call(exception)]*3, retry.mock_calls)
-        self.assertEqual([mock.call(900, delay=1, back_off=1.5)],
+        self.assertEqual([mock.call(1.0, max_delay=60.0, back_off=1.5)],
                          retry_loop.mock_calls)
 
     def run_sender_function(self):

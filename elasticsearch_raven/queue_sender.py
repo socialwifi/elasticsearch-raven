@@ -27,7 +27,7 @@ class Sender(object):
             self.exception_handler(e)
 
     def _send_message(self, message):
-        for retry in utils.retry_loop(15 * 60, delay=1, back_off=1.5):
+        for retry in utils.retry_loop(1.0, max_delay=60.0, back_off=1.5):
             with utils.ignore_signals([signal.SIGTERM, signal.SIGQUIT]):
                 try:
                     self.log_transport.send_message(message)

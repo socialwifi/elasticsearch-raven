@@ -3,14 +3,16 @@ import time
 import signal
 
 
-def retry_loop(timeout, delay, back_off=1.0):
-    start_time = time.time()
+def retry_loop(delay, *, max_delay=None, back_off=1.0):
     exceptions = set()
+    if max_delay is None:
+        max_delay = delay
 
     def retry(exception):
         exceptions.add(exception)
     yield retry
-    while time.time() - start_time <= timeout:
+
+    while delay < max_delay:
         if not exceptions:
             return
         time.sleep(delay)
@@ -18,7 +20,12 @@ def retry_loop(timeout, delay, back_off=1.0):
         exceptions.clear()
         yield retry
 
-    raise exceptions.pop()
+    while True:
+        if not exceptions:
+            return
+        time.sleep(max_delay)
+        exceptions.clear()
+        yield retry
 
 
 @contextlib.contextmanager
