@@ -22,12 +22,12 @@ class Sender(object):
         self.should_finish = False
         try:
             while not self.should_finish:
-                self._send_message()
+                message = self.pending_logs.get()
+                self._send_message(message)
         except Exception as e:
             self.exception_handler(e)
 
-    def _send_message(self):
-        message = self.pending_logs.get()
+    def _send_message(self, message):
         try:
             for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
                 try:
