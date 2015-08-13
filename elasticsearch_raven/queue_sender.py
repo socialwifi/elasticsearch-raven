@@ -1,9 +1,9 @@
-import time
 import threading
 
 import elasticsearch
 
 from elasticsearch_raven import configuration
+from elasticsearch_raven import utils
 
 
 class Sender(object):
@@ -29,7 +29,7 @@ class Sender(object):
 
     def _send_message(self, message):
         try:
-            for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
+            for retry in utils.retry_loop(15 * 60, delay=1, back_off=1.5):
                 try:
                     self.log_transport.send_message(message)
                 except elasticsearch.exceptions.ConnectionError as e:
@@ -48,21 +48,3 @@ class Sender(object):
         body = {'message': str(message), 'error': str(error)}
         connection.index(index='elasticsearch-raven-error', body=body,
                          doc_type='elasticsearch-raven-log')
-
-
-def retry_loop(timeout, delay, back_off=1.0):
-    start_time = time.time()
-    exceptions = set()
-
-    def retry(exception):
-        exceptions.add(exception)
-    yield retry
-    while time.time() - start_time <= timeout:
-        if not exceptions:
-            return
-        time.sleep(delay)
-        delay *= back_off
-        exceptions.clear()
-        yield retry
-
-    raise exceptions.pop()

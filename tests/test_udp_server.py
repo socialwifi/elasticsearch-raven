@@ -1,7 +1,5 @@
 import datetime
-import six
 import socket
-import time
 import threading
 from unittest import TestCase
 
@@ -175,7 +173,7 @@ class GetSenderTest(TestCase):
         self.assertEqual([mock.call.put(exception)],
                          self.exception_queue.mock_calls)
 
-    @mock.patch('elasticsearch_raven.queue_sender.retry_loop')
+    @mock.patch('elasticsearch_raven.utils.retry_loop')
     def test_retry_connection(self, retry_loop):
         self.pending_logs.get.side_effect = [mock.Mock(), Exception]
         exception = elasticsearch.exceptions.ConnectionError('test')
@@ -227,43 +225,3 @@ class GetSenderTest(TestCase):
              doc_type='elasticsearch-raven-log',
              index='elasticsearch-raven-error')],
             Elasticsearch.mock_calls)
-
-
-class RetryLoopTest(TestCase):
-    def test_timeout(self):
-        start_time = time.time()
-        try:
-            for retry in queue_sender.retry_loop(0.001, 0):
-                try:
-                    raise Exception('test')
-                except Exception as e:
-                    retry(e)
-        except Exception:
-            pass
-        self.assertLessEqual(0.001, time.time() - start_time)
-
-    @mock.patch('time.sleep')
-    def test_delay(self, sleep):
-
-        retry_generator = queue_sender.retry_loop(10, 1)
-        for i in range(4):
-                retry = six.next(retry_generator)
-                retry(Exception('test'))
-        self.assertEqual([mock.call(1), mock.call(1), mock.call(1)],
-                         sleep.mock_calls)
-
-
-    @mock.patch('time.sleep')
-    def test_back_off(self, sleep):
-        retry_generator = queue_sender.retry_loop(10, 1, back_off=2)
-        for i in range(4):
-            retry = six.next(retry_generator)
-            retry(Exception('test'))
-        self.assertEqual([mock.call(1), mock.call(2), mock.call(4)],
-                         sleep.mock_calls)
-
-    def test_raises(self):
-        retry_generator = queue_sender.retry_loop(0, 0)
-        retry = six.next(retry_generator)
-        retry(Exception('test'))
-        self.assertRaises(Exception, six.next, retry_generator)
