@@ -34,9 +34,11 @@ class Sender(object):
                     self.log_transport.send_message(message)
                 except elasticsearch.exceptions.ConnectionError as e:
                     retry(e)
+                else:
+                    self.pending_logs.task_done()
         except elasticsearch.exceptions.TransportError as e:
             self._raport_error(message, e)
-        self.pending_logs.task_done()
+            self.pending_logs.task_done()
 
     def _raport_error(self, message, error):
         connection = elasticsearch.Elasticsearch(

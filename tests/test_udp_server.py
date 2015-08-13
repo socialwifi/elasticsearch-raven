@@ -177,8 +177,7 @@ class GetSenderTest(TestCase):
 
     @mock.patch('elasticsearch_raven.queue_sender.retry_loop')
     def test_retry_connection(self, retry_loop):
-        self.pending_logs.get.return_value = mock.Mock()
-        self.pending_logs.task_done.side_effect = Exception('test')
+        self.pending_logs.get.side_effect = [mock.Mock(), Exception]
         exception = elasticsearch.exceptions.ConnectionError('test')
         self.transport.send_message.side_effect = exception
         retry = mock.Mock()
