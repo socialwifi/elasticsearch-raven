@@ -74,14 +74,10 @@ class LogTransport:
         self.send(message_body, index, message_id)
 
     def send(self, body, index, message_id):
-        for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
-            try:
-                with logger_level_to_error('elasticsearch'):
-                    self._connection.index(body=body, index=index,
-                                           id=message_id,
-                                           doc_type=self.DOCUMENT_TYPE)
-            except elasticsearch.exceptions.ConnectionError as e:
-                retry(e)
+        with logger_level_to_error('elasticsearch'):
+            self._connection.index(body=body, index=index,
+                                   id=message_id,
+                                   doc_type=self.DOCUMENT_TYPE)
 
     def search(self, segment_size=1000, **kwargs):
         for offset in itertools.count(step=segment_size):

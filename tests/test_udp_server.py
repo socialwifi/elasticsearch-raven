@@ -1,14 +1,8 @@
 import datetime
-import six
 import socket
-import time
 import threading
 from unittest import TestCase
-
-try:
-    from unitetest import mock
-except ImportError:
-    import mock
+from unittest import mock
 
 import elasticsearch
 
@@ -113,6 +107,7 @@ class GetHandlerTest(TestCase):
         self.sock.recvfrom.side_effect = [({}, ('192.168.1.1', 8888)),
                                           self.exception]
 
+    @mock.patch('elasticsearch_raven.utils.signal', mock.Mock())
     @mock.patch('elasticsearch_raven.udp_handler.datetime')
     @mock.patch('elasticsearch_raven.udp_server.transport.SentryMessage')
     @mock.patch('sys.stdout')
@@ -133,6 +128,7 @@ class GetHandlerTest(TestCase):
         else:
             thread._Thread__target()
 
+    @mock.patch('elasticsearch_raven.utils.signal', mock.Mock())
     @mock.patch('elasticsearch_raven.udp_server.transport.SentryMessage')
     def test_exception(self, SentryMessage):
         self.run_handler_function()
@@ -140,6 +136,7 @@ class GetHandlerTest(TestCase):
         self.assertEqual([mock.call.put(self.exception)],
                          self.exception_queue.mock_calls)
 
+    @mock.patch('elasticsearch_raven.utils.signal', mock.Mock())
     @mock.patch('elasticsearch_raven.udp_server.transport.SentryMessage')
     def test_put_result_and_join_on_queue(self, SentryMessage):
         self.run_handler_function()
@@ -167,6 +164,7 @@ class GetSenderTest(TestCase):
         self.exception_queue = mock.Mock()
         self.transport = mock.Mock()
 
+    @mock.patch('elasticsearch_raven.utils.signal', mock.Mock())
     def test_exception(self):
         self.pending_logs.get.return_value = mock.Mock()
         exception = Exception('test')
@@ -175,17 +173,17 @@ class GetSenderTest(TestCase):
         self.assertEqual([mock.call.put(exception)],
                          self.exception_queue.mock_calls)
 
-    @mock.patch('elasticsearch_raven.queue_sender.retry_loop')
+    @mock.patch('elasticsearch_raven.utils.signal', mock.Mock())
+    @mock.patch('elasticsearch_raven.utils.retry_loop')
     def test_retry_connection(self, retry_loop):
-        self.pending_logs.get.return_value = mock.Mock()
-        self.pending_logs.task_done.side_effect = Exception('test')
+        self.pending_logs.get.side_effect = [mock.Mock(), Exception]
         exception = elasticsearch.exceptions.ConnectionError('test')
-        self.transport.send_message.side_effect = exception
+        self.transport.send_message.side_effect = [exception]*3 + [None]
         retry = mock.Mock()
-        retry_loop.return_value = [retry, retry, retry]
+        retry_loop.return_value = [retry, retry, retry, retry]
         self.run_sender_function()
         self.assertEqual([mock.call(exception)]*3, retry.mock_calls)
-        self.assertEqual([mock.call(900, delay=1, back_off=1.5)],
+        self.assertEqual([mock.call(1.0, max_delay=60.0, back_off=1.5)],
                          retry_loop.mock_calls)
 
     def run_sender_function(self):
@@ -202,6 +200,7 @@ class GetSenderTest(TestCase):
         self.assertIsInstance(result, threading.Thread)
         self.assertEqual(True, result.daemon)
 
+    @mock.patch('elasticsearch_raven.utils.signal', mock.Mock())
     def test_task_done(self):
         self.pending_logs.get.return_value = mock.Mock()
         self.pending_logs.task_done.side_effect = Exception('test')
@@ -209,6 +208,7 @@ class GetSenderTest(TestCase):
         self.assertEqual([mock.call.get(), mock.call.task_done()],
                          self.pending_logs.mock_calls)
 
+    @mock.patch('elasticsearch_raven.utils.signal', mock.Mock())
     @mock.patch('elasticsearch.Elasticsearch')
     def test_log_transport_error(self, Elasticsearch):
         exception = elasticsearch.exceptions.TransportError(404, 'test')
@@ -228,43 +228,3 @@ class GetSenderTest(TestCase):
              doc_type='elasticsearch-raven-log',
              index='elasticsearch-raven-error')],
             Elasticsearch.mock_calls)
-
-
-class RetryLoopTest(TestCase):
-    def test_timeout(self):
-        start_time = time.time()
-        try:
-            for retry in queue_sender.retry_loop(0.001, 0):
-                try:
-                    raise Exception('test')
-                except Exception as e:
-                    retry(e)
-        except Exception:
-            pass
-        self.assertLessEqual(0.001, time.time() - start_time)
-
-    @mock.patch('time.sleep')
-    def test_delay(self, sleep):
-
-        retry_generator = queue_sender.retry_loop(10, 1)
-        for i in range(4):
-                retry = six.next(retry_generator)
-                retry(Exception('test'))
-        self.assertEqual([mock.call(1), mock.call(1), mock.call(1)],
-                         sleep.mock_calls)
-
-
-    @mock.patch('time.sleep')
-    def test_back_off(self, sleep):
-        retry_generator = queue_sender.retry_loop(10, 1, back_off=2)
-        for i in range(4):
-            retry = six.next(retry_generator)
-            retry(Exception('test'))
-        self.assertEqual([mock.call(1), mock.call(2), mock.call(4)],
-                         sleep.mock_calls)
-
-    def test_raises(self):
-        retry_generator = queue_sender.retry_loop(0, 0)
-        retry = six.next(retry_generator)
-        retry(Exception('test'))
-        self.assertRaises(Exception, six.next, retry_generator)

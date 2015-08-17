@@ -1,9 +1,10 @@
-import time
+import signal
 import threading
 
 import elasticsearch
 
 from elasticsearch_raven import configuration
+from elasticsearch_raven import utils
 
 
 class Sender(object):
@@ -11,7 +12,6 @@ class Sender(object):
         self.log_transport = log_transport
         self.pending_logs = pending_logs
         self.exception_handler = exception_handler
-        self.should_finish = False
 
     def as_thread(self):
         sender = threading.Thread(target=self.send)
@@ -19,24 +19,25 @@ class Sender(object):
         return sender
 
     def send(self):
-        self.should_finish = False
         try:
-            while not self.should_finish:
-                self._send_message()
+            while True:
+                message = self.pending_logs.get()
+                self._send_message(message)
         except Exception as e:
             self.exception_handler(e)
 
-    def _send_message(self):
-        message = self.pending_logs.get()
-        try:
-            for retry in retry_loop(15 * 60, delay=1, back_off=1.5):
+    def _send_message(self, message):
+        for retry in utils.retry_loop(1.0, max_delay=60.0, back_off=1.5):
+            with utils.ignore_signals([signal.SIGTERM, signal.SIGQUIT]):
                 try:
                     self.log_transport.send_message(message)
                 except elasticsearch.exceptions.ConnectionError as e:
                     retry(e)
-        except elasticsearch.exceptions.TransportError as e:
-            self._raport_error(message, e)
-        self.pending_logs.task_done()
+                except elasticsearch.exceptions.TransportError as e:
+                    self._raport_error(message, e)
+                    self.pending_logs.task_done()
+                else:
+                    self.pending_logs.task_done()
 
     def _raport_error(self, message, error):
         connection = elasticsearch.Elasticsearch(
@@ -46,21 +47,3 @@ class Sender(object):
         body = {'message': str(message), 'error': str(error)}
         connection.index(index='elasticsearch-raven-error', body=body,
                          doc_type='elasticsearch-raven-log')
-
-
-def retry_loop(timeout, delay, back_off=1.0):
-    start_time = time.time()
-    exceptions = set()
-
-    def retry(exception):
-        exceptions.add(exception)
-    yield retry
-    while time.time() - start_time <= timeout:
-        if not exceptions:
-            return
-        time.sleep(delay)
-        delay *= back_off
-        exceptions.clear()
-        yield retry
-
-    raise exceptions.pop()

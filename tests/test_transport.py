@@ -1,8 +1,8 @@
 import datetime
 import logging
-import mock
 import string
 from unittest import TestCase
+from unittest import mock
 
 from elasticsearch_raven import exceptions
 from elasticsearch_raven import transport
